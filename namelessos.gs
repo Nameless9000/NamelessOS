@@ -234,15 +234,15 @@ end function
 Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
 
 if not loginCheck then
-	Print(L.C+t.t+"<b>Login:</b>")
-	user = user_input(L.C+t.it+"	Username: "+t.i)
-	pass = md5(user_input(L.C+t.it+"	Password: "+t.i,1))
+	Print(+t.t+"<b>Login:</b>")
+	user = user_input(L.c+t.it+"	Username: "+t.i)
+	pass = md5(user_input(L.c+t.it+"	Password: "+t.i,1))
 	if loginCheck(user,pass) == false then
-		Print(t.e+L.C+"<b>Invalid username &/or password!")
+		Print(t.e+L.c+"<b>Invalid username &/or password!")
 		wait(0.5)
 		exit(clear_screen())
 	else
-		Print("\n"+t.s+L.C+"<i>Welcome to NamelessOS, <b>"+t.user+user)
+		Print("\n"+t.s+L.c+"<i>Welcome to NamelessOS, <b>"+t.user+user)
 		wait(0.5)
 		clear_screen()
 	end if
