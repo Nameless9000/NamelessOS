@@ -234,7 +234,7 @@ end function
 Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
 
 if not loginCheck then
-	Print(+t.t+"<b>Login:</b>")
+	Print(t.t+"<b>Login:</b>")
 	user = user_input(L.c+t.it+"	Username: "+t.i)
 	pass = md5(user_input(L.c+t.it+"	Password: "+t.i,1))
 	if loginCheck(user,pass) == false then
