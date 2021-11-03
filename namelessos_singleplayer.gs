@@ -2387,6 +2387,22 @@ Commands["ssh"]["Run"] = function(args,pipe)
 	
 end function
 
+Commands["masterkey"] = {"Name": "masterkey","Description": "lol this is just op (if u have access)","Args": "[ip] [port]"}
+Commands["masterkey"]["Run"] = function(args,pipe)
+	if pipe then args[0] = pipe
+
+	ip = args[0]
+	port = args[1].to_int
+
+	if typeof(port) != "number" then return error("Invalid port: "+port)
+	remote = globals.shell.masterkey(ip, port)
+	if remote then
+		wlsys(remote)
+		return getShell(remote)
+	end if
+	
+end function
+
 Commands["echo"] = {"Name": "echo","Description": "Prints text.","Args": "[text]"}
 Commands["echo"]["Run"] = function(args,pipe)
 	if pipe then args[0] = pipe
