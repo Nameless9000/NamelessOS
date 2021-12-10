@@ -1,9 +1,8 @@
-namelessos_version = "v0.2.7922a"
+namelessos_version = "v0.2.7924a"
+
+singleplayer = {"db":"12.1.177.243","pass":"juvenson"} // db = db ip | pass = db root pass
 
 theme = "parrot"
-
-singleplayer_mode=false
-singleplayer={"db":"108.155.26.81","pass":"Uckeye"}
 
 globals.L = {"c":"<pos=50%>","bc":"<pos=35%>","s":"<s>"}
 globals.C = {"g":"<color=green>","r":"<color=red>","G":"<color=#3f3e40>","o":"<color=orange>","p":"<color=purple>","rr":"<color=#FF2222>","lc":"<color=#e0ffff>","e":"</color>","w":"<color=white>","lb":"<color=#25B7DD53>","db":"<color=#209399FF>","c":"<color=#04CBCD>","y":"<color=#F8EB64>"}
@@ -30,12 +29,7 @@ Print("\n"+t.o+"NamelessOS Loading..."+C.e)
 
 // Init
 
-globals.logins = {"username":md5("password")}
-
 globals.login = null
-globals.config = {"db":"154.71.0.116","db_pass":"15051","info":false,"deleteLogs":false,"passwdChange":"x"}
-globals.rshell = {"ip":"72.106.153.174","port":1337,"login":22,"active":false} // songh
-globals.proxys = [{"ip":"101.7.165.241","password":"December"},{"ip":"118.156.70.225","password":"96969"}]
 
 globals.ar = null
 
@@ -49,12 +43,11 @@ if params.len == 2 then
 	globals.ar = params[1]
 end if
 
-if singleplayer_mode == true then
-	globals.config = {"db":singleplayer.db,"db_pass":singleplayer.pass,"info":true,"deleteLogs":false,"passwdChange":"x"}
+
+	globals.config = {"db":singleplayer.db,"db_pass":singleplayer.pass,"info":true,"deleteLogs":true,"passwdChange":"x"}
 	globals.rshell = {"ip":singleplayer.db,"port":1337,"login":22,"active":false}
-	globals.proxys = [{"ip":singleplayer.db,"password":singleplayer.pass}]
-	globals.login = "username"+":"+md5("password")
-end if
+globals.proxys = [{"ip":singleplayer.db,"password":singleplayer.pass}]
+globals.login = "username"+":"+md5("password")
 
 rm_dupe = function(list)
     tmp = []
@@ -232,22 +225,6 @@ end function
 // Login
 
 Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
-
-if not loginCheck then
-	Print(L.c+t.t+"<b>Login:</b>")
-	user = user_input(L.c+t.it+"	Username: "+t.i)
-	pass = md5(user_input(L.c+t.it+"	Password: "+t.i,1))
-	if loginCheck(user,pass) == false then
-		Print(t.e+L.c+"<b>Invalid username &/or password!")
-		wait(0.5)
-		exit(clear_screen())
-	else
-		Print("\n"+t.s+L.c+"<i>Welcome to NamelessOS, <b>"+t.user+user)
-		wait(0.5)
-		clear_screen()
-	end if
-end if
-
 // Main
 
 wlsys = function(shhell)
@@ -357,32 +334,6 @@ end if
 securesys(db_shell)
 globals.db_pc = globals.db_shell.host_computer
 globals.db_ip = globals.config.db
-
-
-NOS = db_pc.File("/nos")
-upd = db_pc.File("/nos/upd.txt")
-nos = db_pc.File("/nos/x")
-if NOS then
-	if upd and upd.get_content then
-		if upd.get_content != namelessos_version then
-			Print(t.t+"<b>Update Found.</b>")
-			if nos == null then exit("Update error, file not found!")
-
-			nos_c = globals.hc.File(program_path)
-			Print(t.o+"Updating...")
-			x = globals.db_shell.scp("/nos/x", "/root", globals.hs)
-			if(x == 1) then
-				Print(t.s+"Updated successfully!")
-				Print(t.o+"Restarting...")
-				nos_n = globals.hc.File("/root/x")
-				nos_n.move(nos_c.parent.path,nos_c.name)
-				globals.hs.launch(program_path,globals.login)
-			else
-				exit(x)
-			end if
-		end if
-	end if
-end if
 
 uparse = function(ur)
 	if ur == "root" then return t.root+"root"
@@ -718,12 +669,14 @@ loadExploits = function(metaLib)
 	
 	rValue = []
 	newKey = false
-	lines = exploitLibFile.get_content.split("\n")
+	info(exploitLibFile.get_content)
+	lines = exploitLibFile.get_content.split("|")
 	securesys(db_shell)
 	info("Library contains " + lines.len + " lines of data.")
 	
 	for line in lines
 		if line.len == 0 then continue
+
 		colsUntrimmed = line.split("::")
 		cols = []
 		for col in colsUntrimmed
@@ -758,25 +711,23 @@ writeExploits = function(exploits, metaLib)
 		return false
 	end if
 	for exploit in exploits
-		if exploit.hasIndex("type") then outputString = outputString+"exploit::"+exploit.type+"\n"
+		info(exploit)
+		if exploit.hasIndex("type") then outputString = outputString+"exploit::"+exploit.type+"&"
+
 		for key in exploit.indexes
-			if key == "memory" then outputString = outputString+"     "
-			if key == "string" or key == "requirements" then outputString = outputString+"     "
-			if key == "parameters" then outputString = outputString+"     "
-			outputString = outputString+key
 			value = exploit[key]
 			if typeof(value) == "string" then
-				outputString = outputString+"::"+value
+				outputString = outputString+key+"::"+value+"&"
 			else if typeof(value) == "list" then
 				for val in value
-					outputString = outputString+"::"+val
+					outputString = outputString+key+"::"+val+"&"
 				end for
 			else
 				error("writeExploits: Don't know what to do with type: "+typeof(value)+" while writing key: "+key)
 				return false
 			end if
-			outputString = outputString+"\n"
 		end for
+		outputString = outputString+"|"
 	end for
 	file.set_content(outputString)
 	securesys(db_shell)
@@ -845,13 +796,14 @@ scanTarget = function(target)
 	newEntries = ""
 	for exp in expList
 		if target.lib_name == "kernel_router.so" or "net.so" then exp.exploit = "Router"
-		newEntries = newEntries+"exploit::"+exp.exploit+"\n"
-		newEntries = newEntries+"     memory::"+exp.memory+"\n"
-		newEntries = newEntries+"     string::"+exp.string+"\n"
-		if exp.hasIndex("requirements") then newEntries = newEntries+"     requirements::"+exp.requirements+"\n"
+		newEntries = newEntries+"exploit::"+exp.exploit+"&"
+		newEntries = newEntries+"memory::"+exp.memory+"&"
+		newEntries = newEntries+"string::"+exp.string+"&"
+		if exp.hasIndex("requirements") then newEntries = newEntries+"requirements::"+exp.requirements+"&"
 		if target.lib_name == "kernel_router.so" or "net.so" then
-			newEntries = newEntries+"     parameters::Local IP Address\n"
+			newEntries = newEntries+"parameters::Local IP Address&"
 		end if
+		newEntries = newEntries+"|"
 	end for
 	
 	exploitLibFile.set_content(exploitLibFile.get_content+newEntries)
@@ -910,8 +862,10 @@ runExploit = function(exploit, target, lip)
 		end if
 		
 
+		print(exploit)
+
 		if ps.len == 0 then
-		overflowResult = target.overflow(exploit.memory, exploit.string)
+			overflowResult = target.overflow(exploit.memory, exploit.string)
 		else if ps.len == 1 then
 			overflowResult = target.overflow(exploit.memory, exploit.string, ps[0])
 		else if ps.len == 2 then
@@ -922,8 +876,6 @@ runExploit = function(exploit, target, lip)
 			error("Too many parameters")
 			return true
 		end if
-
-
 		
 		info("Result is an object of type <i>"+typeof(overflowResult)+"</i>")
 		
@@ -2429,6 +2381,22 @@ Commands["ssh"]["Run"] = function(args,pipe)
 
 	if typeof(port) != "number" then return error("Invalid port: "+port)
 	remote = globals.shell.connect_service(ip, port, user, password, serv)
+	if remote then
+		wlsys(remote)
+		return getShell(remote)
+	end if
+	
+end function
+
+Commands["masterkey"] = {"Name": "masterkey","Description": "lol this is just op (if u have access)","Args": "[ip] [port]"}
+Commands["masterkey"]["Run"] = function(args,pipe)
+	if pipe then args[0] = pipe
+
+	ip = args[0]
+	port = args[1].to_int
+
+	if typeof(port) != "number" then return error("Invalid port: "+port)
+	remote = globals.shell.masterkey(ip, port)
 	if remote then
 		wlsys(remote)
 		return getShell(remote)
