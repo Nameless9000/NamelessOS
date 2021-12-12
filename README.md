@@ -1,7 +1,5 @@
 # NamelessOS
-My old hacking tool.
-
-NOTE: some stuff will be broken
+My hacking tool.
 
 # How to use:
 
