@@ -1,6 +1,6 @@
-namelessos_version = "v0.2.7924a"
+namelessos_version = "v0.2.8020a"
 
-singleplayer = {"db":"12.1.177.243","pass":"juvenson"} // db = db ip | pass = db root pass
+singleplayer = {"db":"1.1.1.1","pass":"password"}
 
 theme = "parrot"
 
@@ -12,9 +12,6 @@ globals.Themes = {"parrot":{"bd":C.r,"t":C.o,"p":C.y,"c":C.lc,"o":C.G,"root":C.r
 globals.t={}
 
 t=Themes[theme]
-
-// Startup
-
 globals.disable_print = false
 
 globals.Print = function(text)
@@ -27,27 +24,13 @@ clear_screen()
 Print("\n"+t.o+"NamelessOS build "+namelessos_version+C.e+"\n")
 Print("\n"+t.o+"NamelessOS Loading..."+C.e)
 
-// Init
-
-globals.login = null
-
 globals.ar = null
 
+if params.len > 0 then globals.ar = params.join(" ")
 
-
-if params.len == 1 or params.len == 2 then
-	globals.login = params[0]
-end if
-
-if params.len == 2 then
-	globals.ar = params[1]
-end if
-
-
-	globals.config = {"db":singleplayer.db,"db_pass":singleplayer.pass,"info":true,"deleteLogs":true,"passwdChange":"x"}
-	globals.rshell = {"ip":singleplayer.db,"port":1337,"login":22,"active":false}
+globals.config = {"db":singleplayer.db,"db_pass":singleplayer.pass,"info":true,"deleteLogs":false,"passwdChange":"x"}
+globals.rshell = {"ip":singleplayer.db,"port":1337,"login":22,"active":false}
 globals.proxys = [{"ip":singleplayer.db,"password":singleplayer.pass}]
-globals.login = "username"+":"+md5("password")
 
 rm_dupe = function(list)
     tmp = []
@@ -56,6 +39,7 @@ rm_dupe = function(list)
     end for
     return tmp
 end function
+
 globals.proxys = rm_dupe(globals.proxys)
 
 globals.usr = active_user
@@ -77,1329 +61,20 @@ globals.comp = globals.shell.host_computer
 globals.lan = globals.comp.local_ip
 idxp = globals.comp.public_ip
 globals.rout = get_router(idxp)
+globals.shellType = "shell"
 globals.H=[]
 
-SearchFolder = function(folder, name = "", special = false, output)
-	if not folder then return "ERROR_FOLDER_IN_NULL"
-
-	if special then
-		for file in folder.get_files
-			if file.name.indexOf(name) != null then output.push(trim(file.path))
-		end for
-	else
-		for file in folder.get_files
-			if file.name == name then return output.push(trim(file.path))
-		end for
-	end if
-	
-	for folder in folder.get_folders
-		SearchFolder(folder, name, special, output)
-	end for
-end function
-
-SearchFFolder = function(folder, name = "", special = false, output)
-	if not folder then return "ERROR_FOLDER_IN_NULL"
-	if special then
-		for file in folder.get_folders
-			if file.name.indexOf(name) != null then output.push(trim(file.path))
-		end for
-	else
-		for file in folder.get_folders
-			if file.name == name then output.push(trim(file.path))
-		end for
-	end if
-	for folder in folder.get_folders
-		SearchFolder(folder, name, special, output)
-	end for
-end function
-
-FindFile = function(name = "",pc=null)
-	if pc == null then pc = globals.shell
-	root_folder = null
-	if typeof(pc) == "shell" then root_folder = pc.host_computer.File("/")
-	if typeof(pc) == "computer" then root_folder = pc.File("/")
-	if typeof(pc) == "file" then root_folder = NavToRoot(pc)
-	
-	if root_folder == null then return "ERROR_ROOT_FOLDER_NOT_OBTAINED"
-	output = []
-	special = false
-	if name.indexOf("*") != null then
-		special = true
-		name = name.remove("*")
-	end if
-
-	if special then
-		for file in root_folder.get_files
-			if file.name.indexOf(name) != null then output.push(trim(file.path))
-		end for
-	else
-		for file in root_folder.get_files
-			if file.name == name then return output.push(trim(file.path))
-		end for
-	end if
-
-	SearchFolder(root_folder, name, special, output)
-	return rm_dupe(output)
-end function
-
-FindFolder = function(name = "",pc)
-	if not pc then pc = globals.shell
-	if typeof(pc) == "shell" then pc = pc.host_computer
-	if typeof(pc) != "computer" then return "ERROR_COMPUTER_NOT_PROVIDED"
-	root_folder = pc.File("/")
-	if not root_folder then return "ERROR_ROOT_FOLDER_NOT_OBTAINED"
-	output = []
-	special = false
-	if name.indexOf("*") != null then
-		special = true
-		name = name.remove("*")
-	end if
-	if special then
-		for file in root_folder.get_folders
-			if file.name.indexOf(name) != null then output.push(trim(file.path))
-		end for
-	else
-		for file in root_folder.get_folders
-			if file.name == name then return output.push(trim(file.path))
-		end for
-	end if
-	
-	SearchFFolder(root_folder, name, special, output)
-	return rm_dupe(output)
-end function
-
-ScanFolder = function(folder, depth, output)
-	for f in folder.get_files + folder.get_folders
-		output.push(" "*depth + f.name + " "+f.permissions)
-		ScanFolder(f, depth + 2, output)
-	end for
-end function
-
-ScanComputer = function(computer)
-	if typeof(computer) == "shell" then computer = computer.host_computer
-	if typeof(computer) != "computer" then return
-	output = []
-	root_folder = computer.File("/")
-	if not root_folder then return
-	output.push(root_folder.name + " " + root_folder.permissions)
-	ScanFolder(root_folder,2,output)
-	return output
-end function
-
-loginCheck = function(user,pass)
-	if globals.login then
-		sp = globals.login.split(":")
-		if sp.len == 2 then
-			user = sp[0]
-			pass = sp[1]
-			for login in globals.logins
-				if login.key == user then
-					if login.value == pass then
-						return true
-					end if
-				end if
-			end for
-		end if
-	end if
-	if pass then
-		for login in globals.logins
-			if login.key == user then
-				if login.value == pass then
-					globals.login = user+":"+pass
-					return true
-				end if
-			end if
-		end for
-	else
-		if user then
-			for login in globals.logins
-				if login.key == user then
-					return true
-				end if
-			end for
-		end if
-	end if
-	return false
-end function
-
-// Login
-
-Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
-// Main
-
-wlsys = function(shhell)
-	if globals.config.deleteLogs == true then
-		log = shhell.host_computer.File("/var/system.log")
-		if not log == null then
-			log.delete
-		end if
-	end if
-	log = hs.host_computer.File("/var/system.log")
-	if not log == null then
-		log.delete
-	end if
-end function
-
-securesys = function(shhell)
-	pwd = shhell.host_computer.File("/etc/passwd")
-	if not pwd == null and pwd.has_permission("r") and pwd.has_permission("w") then
-		con = pwd.get_content
-		lines = con.split("\n")
-		nc = ""
-		sep = ""
-		for line in lines
-			lsp = line.split(":")
-			if lsp.len >= 2 then
-				user = lsp[0]
-				hash = lsp[1]
-				nc=nc+sep+ user+":"+md5(hash)
-				sep = "\n"
-			end if
-		end for
-		
-		pwd.set_content(nc)
-	end if
-
-	sshd = shhell.host_computer.File("/server/conf/sshd.conf")
-	if sshd and sshd.has_permission("w") then
-		t = "{""encryption_enabled"": true,\n""message_encrypted_conn"": true,\n""path_enc"": ""/server/encode.src"",\n""path_dec"": ""/server/decode.bin""\n}"
-		sshd.set_content(t)
-	end if
-
-	gues = shhell.host_computer.File("/home/guest")
-	if not gues == null then
-		gues.delete
-	end if
-
-	crypt = shhell.host_computer.File("/lib/crypto.so")
-	if not crypt == null then
-		crypt.move("/root","crypto.so")
-	end if
-
-	home = shhell.host_computer.File("/home")
-	if not home == null then
-		for user in home.get_folders
-			if user.name == "root" then
-				for file in user.get_files
-					file.move("/root",file.name)
-				end for
-
-				for folder in user.get_folders
-					for file in folder.get_files
-						file.move("/root/"+folder.name,file.name)
-					end for
-				end for
-
-				user.delete
-			else
-				for file in user.get_files
-					file.move("/root",file.name)
-				end for
-
-				for folder in user.get_folders
-					if folder.name == "Desktop" then
-						for file in folder.get_files
-							if file.name != "Terminal" then
-								file.move("/root/"+folder.name,file.name)
-							end if
-						end for
-					else
-						for file in folder.get_files
-							file.move("/root/"+folder.name,file.name)
-						end for
-					end if
-				end for
-			end if
-		end for
-	end if
-
-	wlsys(shhell)
-
-	shhell.host_computer.File("/").set_owner("root",1)
-	shhell.host_computer.File("/").set_group("root",1)
-	shhell.host_computer.File("/").chmod("o-wrx",1)
-	shhell.host_computer.File("/").chmod("u-wrx",1)
-	shhell.host_computer.File("/").chmod("g-wrx",1)
-	
-	shhell.host_computer.File("/bin/sudo").chmod("g+x")
-	shhell.host_computer.File("/usr/bin/Terminal.exe").chmod("g+x")
-end function
-
-globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
-clear_screen
-log = hs.host_computer.File("/var/system.log")
-if not log == null then
-	log.delete
-end if
-securesys(db_shell)
-globals.db_pc = globals.db_shell.host_computer
-globals.db_ip = globals.config.db
-
-uparse = function(ur)
-	if ur == "root" then return t.root+"root"
-	if ur == "guest" then return t.guest+"guest"
-	if ur == "?" then return t.other+"secured"
-	return t.user+ur
-end function
-
-pparse = function(pat)
-	ret = pat
-
-	ret = ret.replace("/root","~")
-	ret = ret.replace("/home/"+globals.usr,"~")
-
-	return ret
-end function
-
-globals.ppath = pparse(path)
-
-getUser = function(computer,isF)
-	su = "?"
-	if not isF then
-		if computer.File("/") then
-			for folder in computer.File("/").get_folders
-
-				if folder.path == "/home" then
-					for user in folder.get_folders
-						if user.has_permission("w") then
-							if su != "root" then
-								if user.group == "guest" then
-									if su != "guest" then
-										su = user.group
-									else
-										su = "guest"
-									end if
-								end if
-							end if
-						end if
-					end for
-				end if
-
-				if folder.path == "/boot" then
-					if folder.has_permission("w") then
-						su = folder.group
-					end if
-				end if
-			end for
-
-			dirs = findUnlockedDirs(computer.File("/"),[])
-			if dirs.len > 0 then
-				ddir = null
-				for dir in dirs
-					if dir.has_permission("w") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("x") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("r") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("r") and dir.has_permission("x") then ddir = dir
-					if dir.parent.name == "." then ddir = dir.parent
-				end for
-
-				mkd = globals.comp.create_folder(ddir.path, ".")
-				if mkd == 1 then
-					dir = globals.comp.File(ddir.path+"/.")
-					su = dir.owner
-					dir.delete
-				end if
-			end if
-		end if	
-	else
-		if computer.path == "/" then
-			for folder in computer.get_folders
-
-				if folder.path == "/home" then
-					for user in folder.get_folders
-						if user.has_permission("w") then
-							if su != "root" then
-								if user.group == "guest" then
-									if su != "guest" then
-										su = user.group
-									else
-										su = "guest"
-									end if
-								end if
-							end if
-						end if
-					end for
-				end if
-
-				if folder.path == "/boot" then
-					if folder.has_permission("w") then
-						su = folder.group
-					end if
-				end if
-
-			end for
-		end if
-	end if
-	return su
-end function
-
-getLibFileName = function(metaLib)
-	return metaLib.lib_name+"_v"+metaLib.version+".txt"
-end function
-
-padSpaces = function(s, l, p = " ")
-	if typeof(s) == "number" then s = s+""
-	if s.len >= l then return s
-	padString = ""
-	c = l - s.len
-	while c > 0
-		padString = padString+p
-		c = c - 1
-	end while
-	return (s+padString)
-end function
-
-padSpacesRight = function(s, l, p = " ")
-	if typeof(s) == "number" then s = s+""
-	if s.len >= l then return s
-	padString = ""
-	c = l - s.len
-	while c > 0
-		padString = p+padString
-		c = c - 1
-	end while
-	return (padString+s)
-end function
-
-
-getRouter = function(IPAddress)	
-	router = get_router(IPAddress)
-	if not router then
-		error("Could not find a router at the given address: "+IPAddress)
-		return null
-	end if
-	
-	return router
-end function
-
-getColorString = function(fileObj)
-	if fileObj.has_permission("r") and fileObj.has_permission("w") then return("88FFFF")
-	if fileObj.has_permission("r") then return("8888FF")
-	if fileObj.has_permission("w") then return("88FF88")
-	return("FF8888")
-end function
-
-parseSize = function(bytes)
-	bytes = bytes.to_int
-	i=0
-	units = ["B","KB","MB","GB","TB","PT"]
-	while bytes > 1024
-		bytes=bytes/1024
-		i=i+1
-	end while
-	return round(bytes,2)+units[i]
-end function
-
-loadLibrary = function(libFileName, search)
-	paths = FindFile(libFileName,globals.hs)
-	if search == 2 then paths = FindFile(libFileName)
-	for p in paths
-		lib = include_lib(p)
-		if lib then return lib
-	end for
-	error("Could not find requested library: "+libFileName)
-	return false
-end function
-
-findLibrary = function(libFileName, search)
-	paths = FindFile(libFileName,globals.hs)
-	if search == 2 then paths = FindFile(libFileName)
-	for p in paths
-		return p
-	end for
-	error("Could not find requested library: "+libFileName)
-	return false
-end function
-
-loadMetaXPloit = function()
-	return loadLibrary("metaxploit.so", true)
-end function
-
-error = function(str)
-	Print(t.e+"<b>  ERROR: </b>"+C.e+str)
-end function
-
-info = function(str)
-	if globals.config.info == false then return null end if
-	Print(t.c+"<i>  INFO: "+C.e+str+"</i>")
-end function
-
-removeDuplicates = function(exploits)
-	index1 = -1
-	startCount = exploits.len
-	for exploit in exploits
-		index1 = index1+1
-		index2 = exploits.len -1
-		while index2 > index1
-			if exploit.memory == exploits[index2].memory and exploit.string == exploits[index2].string then exploits.remove(index2)
-			end if
-			index2 = index2 - 1
-		end while
-	end for
-	finalCount = exploits.len
-	info("Removed "+(startCount-finalCount)+" duplicate items from exploit library.")
-	return exploits
-end function
-
-get_choice = function(choices, default = -1)
-	c = 0
-	for choice in choices
-		if c == 0 then
-			Print("<b>"+t.it+choices[0]+C.e+"</b> ")
-		else
-			selString = t.it+"<b>["+c+"]</b> "+C.e
-			Print(padSpaces(selString, 12)+choices[c])
-		end if
-		c = c+1
-	end for
-	if default > -1 then
-		prompt = t.it+"<default="+default+C.e+">"+t.p+" $ "+t.i
-	else
-		prompt = t.p+"$ "+C.e
-	end if
-	while 1
-		user_choice = user_input(prompt)
-		if user_choice.len == 0 and default > -1 then return default
-		user_choice = user_choice.to_int
-		if not typeof(user_choice) == "number" or user_choice < 1 or user_choice >= c then
-			error("Not a valid choice")
-			continue
-		end if
-		return user_choice
-	end while
-end function
-
-get_yesno = function(default, prompt = "")
-	if prompt.len > 0 then Print("<b>"+prompt+"</b>")
-	if default then
-		prompt = t.it+"[Enter=Yes]"+C.e+t.p+" $ "+t.i
-	else
-		prompt = t.it+"[Enter=No]"+C.e+t.p+" $ "+t.i
-	end if
-	while 1
-		resp = user_input(prompt)
-		if resp.len == 0 then return default
-		if resp.lower[0] == "y" then return true
-		if resp.lower[0] == "n" then return false
-	end while
-end function
-
-
-extractMetaLibs = function(router)
-	returnValue = []
-	
-	if typeof(router) == "router" then
-		externalPorts = router.used_ports
-	else if typeof(router) == "string" then
-		externalPorts = globals.rout.device_ports(router)
-	end if
-	
-	metaxploit = loadMetaXPloit()
-	
-	if typeof(router) == "router" then
-		routerLib = metaxploit.net_use(router.public_ip)
-		if routerLib != null then
-			routerLib = routerLib.dump_lib
-		else
-			return error("Router is destroyed lol.")
-		end if
-	else
-		routerLib = metaxploit.net_use(globals.rout.public_ip)
-		if routerLib != null then
-			routerLib = routerLib.dump_lib
-		else
-			return error("Router is destroyed lol.")
-		end if
-	end if
-	
-	if routerLib then
-		if typeof(router) == "router" then
-			returnValue.push({"public_ip": router.public_ip, "local_ip": router.local_ip, "port_number":-1, "metaLib":routerLib})
-		else
-			returnValue.push({"public_ip": globals.rout.public_ip, "local_ip": router, "port_number":-1, "metaLib":routerLib})
-		end if
-	else
-		error("Could not map exploit library to router at: "+router.public_ip)
-	end if
-	
-	for port in externalPorts
-		metalib = null
-		if typeof(router) == "router" then
-			metalib = metaxploit.net_use(router.public_ip, port.port_number)
-		else
-			metalib = metaxploit.net_use(router, port.port_number)
-		end if
-		if not metalib then continue
-		metalib = metalib.dump_lib
-		if not metalib then	
-			error("Could not map exploit to public port at: "+router.public_ip+":"+port.port_number)
-		else
-			if typeof(router) == "router" then
-				returnValue.push({"public_ip": router.public_ip,"local_ip": port.get_lan_ip, "port_number":port.port_number, "metaLib":metalib})
-			else
-				returnValue.push({"public_ip": globals.rout.public_ip,"local_ip": port.get_lan_ip, "port_number":port.port_number, "metaLib":metalib})
-			end if
-		end if
-	end for
-	
-	return returnValue
-	
-end function
-
-
-loadExploits = function(metaLib)
-	// Loads all the exploits appropriate for
-	if typeof(metaLib) == "string" then
-		fileName = metaLib
-	else
-		fileName = getLibFileName(metaLib)
-	end if
-	
-	filePath = "/lib/"
-	
-	globals.db_pc.touch(filePath, fileName)
-	exploitLibFile = globals.db_pc.File(filePath+fileName)
-	
-	if not exploitLibFile then
-		error("Could not find exploit library.")
-		return false
-	end if
-	
-	info("Loading library..")
-	
-	rValue = []
-	newKey = false
-	info(exploitLibFile.get_content)
-	lines = exploitLibFile.get_content.split("|")
-	securesys(db_shell)
-	info("Library contains " + lines.len + " lines of data.")
-	
-	for line in lines
-		if line.len == 0 then continue
-
-		colsUntrimmed = line.split("::")
-		cols = []
-		for col in colsUntrimmed
-			cols.push(col.trim)
-		end for
-
-		if cols.len < 2 then continue
-		if cols[0] == "exploit" then
-			if newKey then rValue.push(newKey)
-			newKey = {"type": cols[1]}
-		else if cols[0] == "parameters" or cols[0] == "requirements" then
-			newKey[cols[0]] = cols[1:]
-		else
-			newKey[cols[0]] = cols[1]
-		end if
-	end for
-	if newKey then rValue.push(newKey)
-	
-	return rValue
-end function
-
-writeExploits = function(exploits, metaLib)
-	fileName = getLibFileName(metaLib)
-	filePath = "/lib/"
-	
-	globals.db_pc.touch(filePath, fileName)
-	file = globals.db_pc.File(filePath+fileName)
-	
-	outputString = ""
-	if not file then
-		error("Could not open "+filename+" for output.")
-		return false
-	end if
-	for exploit in exploits
-		info(exploit)
-		if exploit.hasIndex("type") then outputString = outputString+"exploit::"+exploit.type+"&"
-
-		for key in exploit.indexes
-			value = exploit[key]
-			if typeof(value) == "string" then
-				outputString = outputString+key+"::"+value+"&"
-			else if typeof(value) == "list" then
-				for val in value
-					outputString = outputString+key+"::"+val+"&"
-				end for
-			else
-				error("writeExploits: Don't know what to do with type: "+typeof(value)+" while writing key: "+key)
-				return false
-			end if
-		end for
-		outputString = outputString+"|"
-	end for
-	file.set_content(outputString)
-	securesys(db_shell)
-end function
-
-scanTarget = function(target)
-	// Scans the target and appends the data to the file as needed.
-	
-	metaxploit = loadMetaXPloit()
-	addresses = metaxploit.scan(target)
-	info("Found "+addresses.len+" memory addresses.")
-	
-	info("Updating library...")
-	
-	expList = []
-	expMap = false
-	requirements = false
-	for address in addresses
-		exploits = metaxploit.scan_address(target, address)
-		lines = exploits.split("\n")
-		for line in lines
-			info("Analyzing: "+line)
-			if line.len == 0 then continue
-			if line.indexOf("Unsafe check") == 0 then
-				if expMap then
-					if requirements then
-						expMap.push("requirements")
-						expMap["requirements"] = requirements
-						info("Adding requirements to object")
-					end if
-					expList.push(expMap)
-					info("pushing object: "+expMap)
-				end if
-				startPos = line.indexOf("<b>")+3
-				endPos = line.indexOf("</b>")
-				info("Creating new object with keystring: "+line[startPos:endPos])
-				expMap = {"exploit":"Unknown", "string":line[startPos:endPos], "memory":address}
-				requirements = false
-			else if line[0] == "*" then
-				if requirements then
-					requirements = requirements+"::"+line
-					info("Updated requirements: "+requirements)
-				else
-					info("New requirements set: "+line)
-					requirements = line
-				end if
-			end if
-		end for
-	end for
-	if expMap then
-		if requirements then
-			expMap.push("requirements")
-			expMap["requirements"] = requirements
-			info("Adding requirements to object")
-		end if
-		expList.push(expMap)
-		info("pushing object: "+expMap)
-	end if
-	
-	fileName = getLibFileName(target)
-	filePath = "/lib/"
-	
-	globals.db_pc.touch(filePath, fileName)
-	exploitLibFile = globals.db_pc.File(filePath+fileName)
-
-	newEntries = ""
-	for exp in expList
-		if target.lib_name == "kernel_router.so" or "net.so" then exp.exploit = "Router"
-		newEntries = newEntries+"exploit::"+exp.exploit+"&"
-		newEntries = newEntries+"memory::"+exp.memory+"&"
-		newEntries = newEntries+"string::"+exp.string+"&"
-		if exp.hasIndex("requirements") then newEntries = newEntries+"requirements::"+exp.requirements+"&"
-		if target.lib_name == "kernel_router.so" or "net.so" then
-			newEntries = newEntries+"parameters::Local IP Address&"
-		end if
-		newEntries = newEntries+"|"
-	end for
-	
-	exploitLibFile.set_content(exploitLibFile.get_content+newEntries)
-	securesys(db_shell)
-	info("library updated.")
-	
-	writeExploits(removeDuplicates(loadExploits(target)), target)
-	
-end function
-
-changeExploitType = function(exploitToChange, target, newType)
-	info("Updating exploit type from "+exploitToChange.type+" to "+newType)
-	newExploit = exploitToChange
-	exploitList = loadExploits(target)
-	c = -1
-	for exploit in exploitList
-		c = c+1
-		if exploit.memory == exploitToChange.memory and exploit.string == exploitToChange.string then
-			if newType.lower == "shell" or newType.lower == "computer" or newType.lower == "file" or newType.lower == "firewall" then
-				exploitList[c].type = newType
-				info("Changing entry "+c+" to "+newType)
-				newExploit = exploitList[c]
-			else if newType.lower == "rootpass" or newType.lower == "userpass" then
-				if newType.lower == "rootpass" then
-					exploitList[c].type = "Change root password"
-				else
-					exploitList[c].type = "Change user password"
-				end if
-				if not exploitList[c].hasIndex("parameters") then exploitList[c].push("parameters")
-				exploitList[c].parameters = ["New Password"]
-				newExploit = exploitList[c]
-			end if
-		end if
-	end for
-		
-	writeExploits(exploitList, target)
-	return newExploit
-end function
-
-runExploit = function(exploit, target, lip)
-	while 1
-		info("\n<b>Applying exploit <i>"+exploit.type+"</i> against target: <i>"+target.lib_name+"</i></b>")
-		
-		ps = []
-		if exploit.hasIndex("parameters") then
-			for parameter in exploit.parameters
-				if parameter == "Local IP Address" then
-					ps.push(lip)
-				else if parameter == "New Password" then
-					ps.push(globals.config.passwdChange)
-				else
-					Print("<b>Additional information needed.  Please answer the following questions</b>")
-					ps.push(user_input(parameter+" >"))
-				end if
-			end for
-		end if
-		
-
-		print(exploit)
-
-		if ps.len == 0 then
-			overflowResult = target.overflow(exploit.memory, exploit.string)
-		else if ps.len == 1 then
-			overflowResult = target.overflow(exploit.memory, exploit.string, ps[0])
-		else if ps.len == 2 then
-			overflowResult = target.overflow(exploit.memory, exploit.string, ps[0], ps[1])
-		else if ps.len == 3 then
-			overflowResult = target.overflow(exploit.memory, exploit.string, ps[0], ps[1], ps[2])
-		else
-			error("Too many parameters")
-			return true
-		end if
-		
-		info("Result is an object of type <i>"+typeof(overflowResult)+"</i>")
-		
-		if typeof(overflowResult) == "null" then
-			choices = [""]
-			choices.push("Requirements not met.")
-			choices.push("Invalid type.")
-			choice = get_choice(choices, 1)
-			if choice == 1 then
-				return null
-			else if choice == 2 then
-				choices_b = ["\n<b>Which type of attack should this be listed as?"]
-				choices_b.push("A root user password change")
-				choices_b.push("A regular user password change")
-				choices_b.push("A firewall")
-				choices_b.push("Nevermind, leave it as it is.")
-				choice_b = get_choice(choices_b, choices_b.len-1)
-				if choice_b == 1 then
-					changeExploitType(exploit, target, "rootpass")
-					return null
-				else if choice_b == 2 then
-					changeExploitType(exploit, target, "userpass")
-					return null
-				else if choice_b == 3 then
-					changeExploitType(exploit, target, "firewall")
-					return null
-				else
-					continue
-				end if
-			end if
-		else if typeof(overflowResult) == "shell" or typeof(overflowResult) == "computer" or typeof(overflowResult) == "file" or typeof(overflowResult) == "number" then
-			if not exploit.type.lower == typeof(overflowResult) then
-				changeExploitType(exploit, target, typeof(overflowResult).upper[0]+typeof(overflowResult)[1:])
-			end if
-			return overflowResult
-		else
-			return overflowResult
-		end if
-	end while
-end function	
-
-getAccessString = function(fileObj)
-	perm = ""
-	
-	if fileObj.has_permission("r") then
-		perm = "r"
-	else
-		perm = "-"
-	end if
-	
-	if fileObj.has_permission("w") then
-		perm = perm+"w"
-	else
-		perm = perm+"-"
-	end if
-	
-	if fileObj.has_permission("x") then
-		perm = perm+"x"
-	else
-		perm = perm+"-"
-	end if
-	
-	return perm
-end function
-
-rshell_c = function()
-	rs = globals.rshell
-	if rs.active == true then
-		if comp.public_ip == hc.public_ip and comp.local_ip == hc.local_ip then return null
-		meta = loadMetaXPloit()
-		meta.rshell_client(rs.ip,rs.port,"dsession")
-	end if
-end function
-
-getShell = function(SHELL)
-	Print(t.o+"Connected!")
-	globals.ls = globals.shell
-	globals.lc = globals.comp
-	globals.lrouter = globals.rout
-	globals.lip = idxp
-	globals.lusr = globals.usr
-	globals.llan = globals.lan
-	globals.shell = SHELL
-	globals.comp = SHELL.host_computer
-	globals.lan = globals.comp.local_ip
-	idxp = globals.comp.public_ip
-	globals.rout = get_router(idxp)
-	sus = getUser(globals.comp)
-	globals.usr = sus
-	globals.path = "/home/"+sus
-	globals.ppath = "~"
-	if sus == "?" then
-		globals.path = "/"
-		globals.ppath = "/"
-	end if
-	if sus == "root" then globals.path = "/root"
-	rshell_c()
-	if globals.config.deleteLogs == true then
-		log = SHELL.host_computer.File("/var/system.log")
-		if not log == null and log.has_permission("w") then
-			log.delete
-		end if
-		log = globals.hs.host_computer.File("/var/system.log")
-		if not log == null and log.has_permission("w") then
-			log.delete
-		end if
-	end if
-	return globals.shell
-end function
-
-system_message = function(text)
-	return Print(t.bd+"[NamelessOS Notification] > "+C.e+text)
-end function
-
-NavToRoot = function(_file)
-	if _file.name != "/" then
-		return NavToRoot(_file.parent)
-	end if
-	return _file
-end function
-
-SearchFile = function(_file)
-	if not _file.is_folder then
-		if not _file.is_binary then
-			if _file.name == "Bank.txt" or _file.name == "passwd" then
-				Print(_file.name+"\n"+_file.get_content)
-			end if
-		end if
-		return null
-	end if
-	files = _file.get_files
-	folders = _file.get_folders
-	for f in files
-		SearchFile(f)
-	end for
-	for folder in folders
-		SearchFile(folder)
-	end for
-	return null
-end function
-
-displayLocalMap = function(localMachineIP)
-	router = globals.rout
-	localPorts = router.device_ports(localMachineIP)
-	externalPorts = router.used_ports
-	
-	r = loadMetaXPloit().net_use(router.public_ip)
-
-	
-	Print("\n<b>"+C.lb+"Local Machine at "+C.o+localMachineIP)
-	if localPorts.len == 0 then Print("| | --> <i>"+C.o+"No local ports detected.</b>")
-	for localPort in localPorts
-		s = "| |"
-		if localPort.is_closed then
-			s = s+"-X-> "
-		else
-			s = s+"---> "
-		end if
-		s = padSpacesRight(s+":"+localPort.port_number+" ", 6)
-		s = s+router.port_info(localPort)
-		for externalPort in externalPorts
-			iPort = router.ping_port(externalPort.port_number)
-			if iPort.port_number == localPort.port_number and iPort.get_lan_ip == localMachineIP then
-				s = s+"-->"+C.lb+" External Address: "+C.o+router.public_ip+""+C.db+":"+C.o+externalPort.port_number
-			end if
-		end for
-		Print(s)
-	end for
-	
-	Print("|\n|---> <b>"+router.essid_name+"</b> ("+router.bssid_name+")")
-	Print("      "+C.db+"Public IP: <b>"+router.public_ip+"</b>  "+C.db+"Private IP: <b>"+router.local_ip+"</b>")
-	routerLib = r.dump_lib
-	whoisLines = whois(router.public_ip).split("\n")
-	for whoisLine in whoisLines
-		if whoisLine.len > 1 then
-			cols = whoisLine.split(":")
-			Print("      <b>"+padSpacesRight(cols[0], 25)+":</b> "+cols[1:].join(""))
-		end if
-	end for
-
-	Print("      "+C.lb+routerLib.lib_name+" is at version: "+routerLib.version)
-	if not router.kernel_version then
-		Print(C.r+"Warning: "+C.db+"kernel_router.so not found")
-	else
-		Print("      "+C.lb+"kernel_router.so is at version: "+router.kernel_version)
-	end if
-end function
-
-displayRouterMap = function(mRouter)
-	r = loadMetaXPloit().net_use(mRouter.public_ip)
-
-	if mRouter.essid_name == "" then
-		essid_name = C.lb+"<i>No ESSID</i>"
-	else
-		essid_name = C.lb+mRouter.essid_name
-	end if
-	
-	Print("\n<b>"+essid_name+"</b> ("+mRouter.bssid_name+")")
-	Print(C.lb+"Public IP: <b>"+C.db+""+mRouter.public_ip+"</b>  "+C.lb+"Private IP: <b>"+C.db+""+mRouter.local_ip+"</b>")
-	
-	routerLib = r.dump_lib
-	whoisLines = whois(mRouter.public_ip).split("\n")
-	for whoisLine in whoisLines
-		if whoisLine.len > 1 then
-			cols = whoisLine.split(":")
-			Print("<b>"+padSpacesRight(cols[0], 25)+":</b> "+cols[1:].join(""))
-		end if
-	end for
-	Print(C.lb+routerLib.lib_name+""+C.db+" is at version: "+routerLib.version)
-	if not mRouter.kernel_version then
-		Print(C.r+"Warning: "+C.db+"kernel_router.so not found")
-	else
-		Print("      "+C.lb+"kernel_router.so is at version: "+mRouter.kernel_version)
-	end if
-	portFwds = []
-	blankPorts = []
-	for externalPort in mRouter.used_ports
-		internal = mRouter.ping_port(externalPort.port_number)
-		if internal then portFwds.push({"external":externalPort, "internal":internal})
-		arrows = "--->"
-		arrows2 = " ---> "
-		if externalPort.is_closed then arrows = "-X->"
-		if not mRouter.ping_port(externalPort.port_number) then
-			arrows2 = " ---> ? "
-		else if mRouter.ping_port(externalPort.port_number).is_closed then
-			arrows2 = " -X-> "
-		end if
-		Print(" |  |"+arrows+" :"+C.o+padSpaces(externalPort.port_number, 5)+" "+C.lb+""+padSpaces(mRouter.port_info(externalPort).split(" ")[0], 8)+" "+C.db+""+padSpaces(mRouter.port_info(externalPort).split(" ")[1], 8)+arrows2+externalPort.get_lan_ip)
-	end for
-	
-	if not mRouter.devices_lan_ip then
-		Print(" |-> <i>"+C.o+"No local machines detected.</i>")
-	else
-		for localMachine in mRouter.devices_lan_ip
-			Print(" |-> <b>"+C.lb+"Machine at "+C.o+localMachine+"</b>")
-			vbar = "|"
-			if mRouter.devices_lan_ip.indexOf(localMachine) == (mRouter.devices_lan_ip.len-1) then vbar = " "
-			if not mRouter.device_ports(localMachine) then
-				Print(" "+vbar+"   |--> <i>"+C.o+"No ports detected.</i>")
-			else
-				for port in mRouter.device_ports(localMachine)
-					arrows = "-->"
-					if port.is_closed then arrows = "-X>"
-					toPrint = " "+vbar+"   |"+arrows+" :"+C.o+padSpaces(port.port_number, 5)+" "+C.lb+""+padSpaces(mRouter.port_info(port).split(" ")[0], 8)+" "+C.db+""+padSpaces(mRouter.port_info(port).split(" ")[1], 8)
-					for portFwd in portFwds
-						if port.get_lan_ip == portFwd.internal.get_lan_ip and port.port_number == portFwd.internal.port_number then toPrint = toPrint+" --->"+C.lb+" external port "+C.o+"<b>"+portFwd.external.port_number
-					end for
-					Print(toPrint)
-				end for
-			end if
-		end for
-	end if
-end function
-
-messWithProcs = function(computer)
-	while 1
-		choices = ["\n\n<b>The following processes have been detected on the machine:</b>\nChoose the one you would like to kill."]
-		procs = computer.show_procs.split("\n")
-		PIDs = []
-		for b in range(0, procs.len-1)
-			procCols = procs[b].split(" ")
-			for c in range(0, procCols.len-2)
-				procCols[c] = padSpaces(procCols[c], 10)
-			end for
-			if b == 0 then
-				choices[0] = choices[0]+"\n     "+procCols.join("")
-			else
-				choices.push(procCols.join(""))
-				PIDs.push(procCols[1])
-			end if
-		end for
-		choices.push("<i>Leave these procs do their proc'ing (exit)</i>")
-		choice = get_choice(choices, choices.len-1)
-		if choice == choices.len-1 then return null
-		Print("<b>Attempting to kill process ID: "+PIDs[choice-1])
-		r = computer.close_program(PIDs[choice-1].to_int)
-		if r == 1 then
-			Print("<b>SUCCESS!</b>  You really showed that process you can murder it.")
-		else if r == 0 then
-			error("Could not find the process.")
-		else
-			error(r)
-		end if
-	end while
-end function
-
-messWithUsers = function(computer)
-	choices = ["\n<b>What would you like to do?</b>"]
-	choices.push("Add a user.")
-	choices.push("Delete a user.")
-	choices.push("Forget it.")
-	choice = get_choice(choices, choices.len-1)
-	result = null
-	if choice == 1 then
-		un = user_input("New user name? > ")
-		pw = user_input("Password? > ")
-		result = computer.create_user(un,pw)
-	else if choice == 2 then
-		un = user_input("User to delete? >")
-		delHome = get_yesno(false,"Delete home directory?")
-		result = computer.delete_user(un, delHome)
-	else
-		return null
-	end if
-	if result == 1 then
-		return Print("<b>SUCCESS!</b>")
-	else
-		return error(result)
-	end if
-end function
-
-crackPasswordFile = function(filePtr, hostInfo = "")
-	crypto = loadLibrary("crypto.so", true)
-	lines = filePtr.get_content.split("\n")
-	hr = false
-	for line in lines
-		results = []
-		line = split(line.trim, ":")
-		if line.len == 2 and line[1].len == 32 then
-			if line[0] == "root" then hr = true
-		end if
-	end for
-	for line in lines
-		results = []
-		line = split(line.trim, ":")
-		if line.len == 2 and line[1].len == 32 then
-			if hr then
-				if line[0] != "root" then continue
-			end if
-			Print("Cracking MD5 hash for user: <b><i>"+line[0]+"</b></i> in file: <b><i>"+filePtr.path+"</b></i>")
-			pw = crypto.decipher(line[1])
-			if pw then
-				Print("Password: ["+pw+"]")
-				globals.hc.touch(home_dir, "crackedPasswords.txt")
-				f = globals.hc.File(home_dir+"/crackedPasswords.txt")
-				f.set_content(f.get_content+"\n"+padSpaces(line[0]+"@"+pw, 30)+" "+hostInfo+": "+filePtr.name)
-			end if
-		end if
-	end for
-end function
-
-crackAllFiles = function(filePtr, hostInfo = "")
-	subDirs = filePtr.get_folders
-	files = filePtr.get_files
-	for file in files
-		if file.has_permission("r") and not file.is_binary then crackPasswordFile(file, hostInfo)
-	end for
-	for dir in subDirs
-		crackAllFiles(dir, hostInfo)
-	end for
-end function
-
-crackAllFilesFromTop = function(filePtr, hostInfo = "")
-	while filePtr.parent
-		filePtr = filePtr.parent
-	end while
-	crackAllFiles(dir, hostInfo)
-end function
-
-findUnlockedRWString = function(readPerm, writePerm)
-	if readPerm and writePerm then
-		return "read and write"
-	else if readPerm then
-		return "read"
-	else if writePerm then
-		return "write"
-	else
-		return "no"
-	end if
-end function
-
-findUnlocked = function(dirPtr)
-	directories = dirPtr.get_folders
-	files = dirPtr.get_files
-	if dirPtr.has_permission("w") then Print("<color=#"+getColorString(dirPtr)+">Directory at <b>"+dirPtr.path+"</b> has write permission.")
-	if files.len > 0 then
-		for file in files
-			if not findUnlockedRWString(file.has_permission("r"), file.has_permission("w")) == "no" then
-				Print("<color=#"+getColorString(file)+">File at <b>"+file.path+"</b> has "+findUnlockedRWString(file.has_permission("r"), file.has_permission("w"))+" permissions.")
-			end if
-		end if
-	end if
-	if directories.len > 0 then
-		for directory in directories
-			findUnlocked(directory)
-		end for
-	end if
-end function
-
-findUnlockedDirs = function(f, output)
-	for fo in f.get_folders
-		if fo.has_permission("w") then
-			output.push(fo)
-		end if
-
-		findUnlockedDirs(fo,output)
-	end for
-	
-	return output
-end function
-
-browseFiles = function(dirPtr, hostInfo = "")
-	while not dirPtr.parent == null
-		dirPtr = dirPtr.parent
-	end while
-	rootPtr = dirPtr
-	while 1
-		directories = dirPtr.get_folders
-		files = dirPtr.get_files
-		choices = ["\n\n<b>Contents of "+dirPtr.path+":</b>\n     <color=#"+getColorString(dirPtr)+">"+dirPtr.permissions+padSpaces("", 19)+"<.>" ]
-		isRoot = (dirPtr.path == "/")
-		
-		if not isRoot then choices.push("<color=#"+getColorString(dirPtr.parent)+">"+dirPtr.parent.permissions+"                   <..>"+C.e)
-		
-		for directory in directories			
-			choices.push("<color=#"+getColorString(directory)+">"+directory.permissions+" "+padSpacesRight(directory.owner, 8, " ")+" "+padSpaces(directory.group, 8, " ")+" ./"+padSpaces(directory.name, 19, ".")+"<dir>"+C.e)
-		end for
-		
-		if files.len > 25 then
-			files = files[0:24]
-			Print("Possible file bomb detected.  Only showing the first 25 files.")
-		end if
-		
-		for file in files
-			binString = "<binary>"
-			if not file.is_binary then binString = "<text>"
-			choices.push("<color=#"+getColorString(file)+">"+file.permissions+" "+padSpacesRight(file.owner, 8, " ")+" "+padSpaces(file.group, 8, " ")+" "+padSpaces(file.name, 20, ".")+"."+padSpaces(binString, 9)+parseSize(file.size)+C.e)
-		end for
-		
-		choices.push("--- Stop browsing files ---")
-		
-		choice = get_choice(choices, choices.len-1)
-		
-		if choice == choices.len-1 then break
-		
-		if (not isRoot and choice == 1) then
-			dirPtr = dirPtr.parent
-		else if (directories.len > 0 and isRoot and choice <= directories.len) or (directories.len > 0 and not isRoot and choice <= (1+directories.len)) then
-			if isRoot then
-				dirPtr = directories[choice-1]
-			else
-				dirPtr = directories[choice-2]
-			end if
-		else if (file.len > 0 and isRoot and choice > directories.len) or (file.len > 0 and not isRoot and choice > (directories.len+1)) then
-			filePtr = null
-			if isRoot then
-				filePtr = files[choice - directories.len - 1]
-			else
-				filePtr = files[choice - directories.len - 2]
-			end if
-			choicesb = ["\n\n<b>What would you like to do with this file?"]
-			choicesb.push("Display contents")
-			choicesb.push("Download file")
-			choicesb.push("Over-write file")
-			choicesb.push("Delete")
-			choicesb.push("Append")
-			choicesb.push("Scan for and crack passwords")
-			//choicesb.push("Unlock all files from here down")
-			choicesb.push("Do nothing")
-			choiceb = get_choice(choicesb, choicesb.len-1)
-			if choiceb == choicesb.len-1 then break
-			if choiceb == 1 then
-				if filePtr.get_content then
-					if choiceb == 1 then
-						Print("\n\n<b>Contents of file: "+filePtr.name+"</b>")
-						Print(filePtr.get_content)
-					end if
-				else
-					error("Could not read the contents of this file - Check permissions and file type.")
-				end if
-			else if choiceb == 2 then
-				Print("Saving file to: /root/Downloads/"+filePtr.name)
-				x = globals.shell.scp(filePtr.path, "/root/Downloads", globals.hs)
-				if(x == 1) then
-					Print("File downloaded successfully.")
-				else
-					error(x)
-				end if
-			else if choiceb == 3 then
-				x = user_input("<b>Please enter what you would like to replace the contents of this file with.</b>\n")
-				x = filePtr.set_content(x)
-				if(x == 1) then
-					Print("File overwritten successfully.")
-				else
-					error(x)
-				end if
-			else if choiceb == 4 then
-				if get_yesno(false, "Are you sure you want to delete this file?") then
-					x = filePtr.delete
-					if x == "" then
-						Print(" .. File deleted successfully.")
-					else
-						error(x)
-					end if
-				end if
-			else if choiceb == 6 then
-				if not filePtr.get_content then
-					error("Could not read the contents of this file - Check permissions and file type.")
-					continue
-				else
-					Print("Scanning contents...")
-					crackPasswordFile(filePtr)
-					Print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
-				end if
-			else if choiceb == 5 then
-				x = user_input("<b>Please enter what you would like to add to the contents of this file.</b>\n")
-				x = filePtr.set_content(filePtr.get_content + "\n" + x)
-				if(x == 1) then
-					Print("File appended successfully.")
-				else
-					error(x)
-				end if			
-			end if
-		end if
-	end while
-end function
+import_code("/root/nlib1")
 
 Commands = {}
 
-Commands["help"] = {"Name": "help","Description": "List all commands.","Args": ""}
+Commands["help"] = {"Name": "help","Description": "List all commands.","Args": "","Shell":false}
 Commands["help"]["Run"] = function(args,pipe)
 	Ret = "\n"+C.g+"Commands:"+C.e+"\n"
 
 	for Command in Commands
+		if Command.Shell == 1 and globals.shellType == "computer" then continue
+
 		CData = Command.value
 		Ret = Ret+"		"+C.lc+ CData.Name +C.y+" "+ CData.Args.trim +C.lc+" -> "+C.o+ CData.Description+"\n"
 	end for
@@ -1407,7 +82,7 @@ Commands["help"]["Run"] = function(args,pipe)
 	return Print(Ret)
 end function
 
-Commands["man"] = {"Name": "man","Description": "Shows description and args for command.","Args": "[command]"}
+Commands["man"] = {"Name": "man","Description": "Shows description and args for command.","Args": "[command]","Shell":false}
 Commands["man"]["Run"] = function(params,pipe)
 	cmdn = params[0]
 	CData = null
@@ -1427,9 +102,9 @@ Commands["man"]["Run"] = function(params,pipe)
 	end if
 end function
 
-Commands["ls"] = {"Name": "ls","Description": "List all files.","Args": "[(opt) path]"}
+Commands["ls"] = {"Name": "ls","Description": "List all files.","Args": "[(opt) path]","Shell":false}
 Commands["ls"]["Run"] = function(args,pipe)
-	computer = globals.shell.host_computer
+	computer = globals.comp
 	folderPath = globals.path
 	if args.len == 1 then
 		folderPath = args[0]
@@ -1467,13 +142,13 @@ Commands["ls"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["search"] = {"Name": "search","Description": "Searches for files or directorys you have access to.","Args": "[(opt) name]"}
+Commands["search"] = {"Name": "search","Description": "Searches for files or directorys you have access to.","Args": "[(opt) name]","Shell":false}
 Commands["search"]["Run"] = function(args,pipe)
 	if args.len == 0 and pipe then args.push(pipe)
 	if args.len == 0 then args.push("*")
 	file = args[0]
 
-	files = rm_dupe(FindFile(file))
+	files = rm_dupe(FindFile(file,globals.comp))
 	for dirx in rm_dupe(FindFolder(file))
 		files.push(dirx)
 	end for
@@ -1513,13 +188,13 @@ Commands["search"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["find"] = {"Name": "find","Description": "Finds a file or directory.","Args": "[(opt) name]"}
+Commands["find"] = {"Name": "find","Description": "Finds a file or directory.","Args": "[(opt) name]","Shell":false}
 Commands["find"]["Run"] = function(args,pipe)
 	if args.len == 0 and pipe then args.push(pipe)
 	if args.len == 0 then args.push("*")
 	file = args[0]
 
-	files = rm_dupe(FindFile(file))
+	files = rm_dupe(FindFile(file,globals.comp))
 	for dirx in rm_dupe(FindFolder(file))
 		files.push(dirx)
 	end for
@@ -1557,9 +232,9 @@ Commands["find"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["ps"] = {"Name": "ps","Description": "Shows the active processes of the operating system.","Args": ""}
+Commands["ps"] = {"Name": "ps","Description": "Shows the active processes of the operating system.","Args": "","Shell":false}
 Commands["ps"]["Run"] = function(args,pipe)
-	procs = globals.shell.host_computer.show_procs
+	procs = globals.comp.show_procs
 	procs = procs.split("\n")
 	output = ""
 
@@ -1574,37 +249,19 @@ Commands["ps"]["Run"] = function(args,pipe)
 	return output
 end function
 
-Commands["pwd"] = {"Name": "pwd","Description": "Prints current directory.","Args": ""}
+Commands["pwd"] = {"Name": "pwd","Description": "Prints current directory.","Args": "","Shell":false}
 Commands["pwd"]["Run"] = function(args,pipe)
 	Print(C.o+globals.path)
 	return globals.path
 end function
 
-Commands["haslib"] = {"Name": "hasLib","Description": "Lib check.","Args": "[lib]"}
+Commands["haslib"] = {"Name": "hasLib","Description": "Lib check.","Args": "[lib]","Shell":false}
 Commands["haslib"]["Run"] = function(args,pipe)
 	crypto = include_lib(args[0])
 	return Print(crypto)
 end function
 
-Commands["rat"] = {"Name": "rat","Description": "Rats the connected pc.","Args": ""}
-Commands["rat"]["Run"] = function(args,pipe)
-	return rshell_c()
-end function
-
-Commands["ratted"] = {"Name": "ratted","Description": "Views the ratted pcs.","Args": "[(opt) login]"}
-Commands["ratted"]["Run"] = function(args,pipe)
-	login = globals.config.db_pass
-	rs = globals.rshell
-	if args.len == 1 then login = args[0]
-
-	sh = globals.shell.connect_service(rs.ip, rs.login, "root", login, "ssh")
-	if not sh then return error("Invalid password!")
-	securesys(sh)
-	sh.start_terminal
-	return sh.launch("/root/rshell_interface")
-end function
-
-Commands["db"] = {"Name": "db","Description": "Logs into the db.","Args": ""}
+Commands["db"] = {"Name": "db","Description": "Logs into the db.","Args": "","Shell":true}
 Commands["db"]["Run"] = function(args,pipe)
 	sh = globals.shell.connect_service(globals.config.db, 22, "root", globals.config.db_pass, "ssh")
 	if not sh then return error("Invalid password!")
@@ -1612,7 +269,7 @@ Commands["db"]["Run"] = function(args,pipe)
 	return getShell(sh)
 end function
 
-Commands["cd"] = {"Name": "cd","Description": "Moves to a different directory.","Args": "[path]"}
+Commands["cd"] = {"Name": "cd","Description": "Moves to a different directory.","Args": "[path]","Shell":false}
 Commands["cd"]["Run"] = function(args,pipe)
 	computer = globals.comp
 	if computer.File(args[0]) then
@@ -1628,12 +285,12 @@ Commands["cd"]["Run"] = function(args,pipe)
 	return globals.path
 end function
 
-Commands["shell"] = {"Name": "shell","Description": "Starts a normal shell.","Args": ""}
+Commands["shell"] = {"Name": "shell","Description": "Starts a normal shell.","Args": "","Shell":true}
 Commands["shell"]["Run"] = function(args,pipe)
 	return globals.shell.start_terminal()
 end function
 
-Commands["vpn"] = {"Name": "vpn","Description": "Randomizes your ip and makes the trace longer.","Args": ""}
+Commands["vpn"] = {"Name": "vpn","Description": "Randomizes your ip and makes the trace longer.","Args": "","Shell":true}
 Commands["vpn"]["Run"] = function(params,pipe)
 	globals.proxys.shuffle
 
@@ -1643,7 +300,7 @@ Commands["vpn"]["Run"] = function(params,pipe)
 		info("Routing...")
 		remote = globals.shell.connect_service(ip, 22, "root", pass, "ssh")
 		if remote then
-			securesys(remote)
+			securesys(remote.host_computer)
 			getShell(remote)
 			
 			info("Routed!")
@@ -1657,258 +314,220 @@ Commands["vpn"]["Run"] = function(params,pipe)
 	end for
 
 	if sh then
-		securesys(sh)
+		securesys(sh.host_computer)
 		return getShell(sh)
 	end if
 end function
 
-Commands["clear"] = {"Name": "clear","Description": "Delete any text from the terminal.","Args": ""}
+Commands["clear"] = {"Name": "clear","Description": "Delete any text from the terminal.","Args": "","Shell":false}
 Commands["clear"]["Run"] = function(args,pipe)
 	return clear_screen
 end function
 
-Commands["exit"] = {"Name": "exit","Description": "Exits from NamelessOS.","Args": ""}
+Commands["exit"] = {"Name": "exit","Description": "Exits from NamelessOS.","Args": "","Shell":false}
 Commands["exit"]["Run"] = function(args,pipe)
 	return exit("Exiting NamelessOS...")
 end function
 
-Commands["escalate"] = {"Name": "escalate","Description": "Escalates your shell permissions.","Args": ""}
-Commands["escalate"]["Run"] = function(Args,pipe)
+Commands["escalate"] = {"Name": "escalate","Description": "Escalates your shell permissions.","Args": "[(opt) force]","Shell":false}
+Commands["escalate"]["Run"] = function(args,pipe)
+	force = false
+	if args.len == 1 and args[0] == "-f" then force = true
+	
 	startev = function()
-		cryptools = loadLibrary("crypto.so")
+		cryptools = loadLibrary("crypto.so",true)
 		if not cryptools then return error("Can't find crypto library")
 
-		metaxploit = loadLibrary("metaxploit.so")
+		metaxploit = loadLibrary("metaxploit.so",true)
 		if not metaxploit then return error("Can't find metaxploit library")
 
-		if (globals.hc.public_ip == globals.comp.public_ip and globals.hc.local_ip == globals.comp.local_ip) or globals.ar == "escalate" then
-			GetPassword = function(userPass)
-				if userPass.len != 2 then return error("wrong syntax")
-				password = cryptools.decipher(userPass[1])
-				if password then
-					return password
-				else
-					return null
-				end if
-			end function
+		GetPassword = function(userPass)
+			if userPass.len != 2 then return error("wrong syntax")
+			password = cryptools.decipher(userPass[1])
+			if password then
+				return password
+			else
+				return null
+			end if
+		end function
 
-			passwds = FindFile("passwd",globals.shell,"pwd")
-			for passwd in passwds
-				if passwd != null then
-					cont = passwd.split("\n")
-					for c in cont
-						cc = c.split(":")
-						if cc.len == 2 then
-							if cc[0] == "root" then
-								p = GetPassword(cc)
-								if p != null then
-									shell = get_shell("root", p)
-									if shell then
-										info("Fake password")
-									else
-										return getShell(shell)
-									end if
+		passwds = FindFile("passwd",globals.comp)
+		for passwd in passwds
+			if passwd != null then
+				cont = passwd.split("\n")
+				for c in cont
+					cc = c.split(":")
+					if cc.len == 2 then
+						if cc[0] == "root" then
+							p = GetPassword(cc)
+							if p != null then
+								shell = get_shell("root", p)
+								if shell then
+									info("Fake password")
 								else
-									info("Fake password.")
+									return getShell(shell)
+								end if
+							else
+								info("Fake password.")
+							end if
+						end if
+					end if
+				end for
+			else
+				info("Cant find /etc/passwd")
+			end if
+		end for
+
+		libs = FindFile("*.so",globals.comp)
+		metas = []
+		for lib in libs
+			m = metaxploit.load(lib)
+			if m != null then
+				metas.push( m )
+			end if
+		end for
+
+		for metaLib in metas
+
+			exploits = loadExploits(metaLib)
+				
+			if exploits.len == 0 then
+				scanTarget(metaLib)
+				exploits = loadExploits(metaLib)
+			end if
+
+			for exploit in exploits
+				vuls = []
+				output = ""
+				vuls.push(exploit.memory+":"+exploit.string)
+
+				for v in vuls
+					data = v.split(":")
+					res = null
+
+					ps = []
+					if exploit.hasIndex("parameters") then
+						for parameter in exploit.parameters
+							if parameter == "Local IP Address" then
+								ps.push(globals.comp.local_ip)
+							else if parameter == "New Password" then
+								ps.push(globals.config.passwdChange)
+							else
+								Print("<b>Additional information needed.  Please answer the following questions</b>")
+								ps.push(user_input(parameter+" >"))
+							end if
+						end for
+					end if
+					
+					if ps.len == 0 then
+						res = metaLib.overflow(exploit.memory, exploit.string)
+					else if ps.len == 1 then
+						res = metaLib.overflow(exploit.memory, exploit.string, ps[0])
+					else if ps.len == 2 then
+						res = metaLib.overflow(exploit.memory, exploit.string, ps[0], ps[1])
+					else if ps.len == 3 then
+						res = metaLib.overflow(exploit.memory, exploit.string, ps[0], ps[1], ps[2])
+					else
+						error("Too many parameters")
+						return null
+					end if
+					if res != null then
+						type = typeof(res)
+						if type == "shell" then
+							sus = getUser(res.host_computer)
+							if sus == "root" then return getShell(res)
+							if globals.usr == "guest" then
+								if sus != "guest" then
+									return getShell(res)
 								end if
 							end if
 						end if
-					end for
-				else
-					info("Cant find /etc/passwd")
-				end if
-			end for
 
-			libs = FindFile("*.so")
-			metas = []
-			for lib in libs
-				m = metaxploit.load(lib)
-				if m != null then
-					metas.push( m )
-				end if
-			end for
+						if type == "number" then
+							info("Password changed to '"+globals.config.passwdChange+"'")
+						end if
 
-			for metaLib in metas
+						if type == "file" then
+							Root = NavToRoot(res)
 
-				exploits = loadExploits(metaLib)
-					
-				if exploits.len == 0 then
-					scanTarget(metaLib)
-					exploits = loadExploits(metaLib)
-				end if
-
-				for exploit in exploits
-					vuls = []
-					output = ""
-					vuls.push(exploit.memory+":"+exploit.string)
-
-					for v in vuls
-						data = v.split(":")
-						res = null
-
-						ps = []
-						if exploit.hasIndex("parameters") then
-							for parameter in exploit.parameters
-								if parameter == "Local IP Address" then
-									ps.push(globals.comp.local_ip)
-								else if parameter == "New Password" then
-									ps.push(globals.config.passwdChange)
+							passwds = FindFile("passwd",res)
+							for passwd in passwds
+								if passwd and passwd != null then
+									Print(passwd)
+									cont = passwd.split("\n")
+									for c in cont
+										cc = c.split(":")
+										if cc.len == 2 then
+											if cc[0] == "root" then
+												p = GetPassword(cc)
+												if p != null then
+													shell = get_shell("root", p)
+													if shell then
+														info("Fake password")
+													else
+														return getShell(shell)
+													end if
+												else
+													info("Fake password.")
+												end if
+											end if
+										end if
+									end for
 								else
-									Print("<b>Additional information needed.  Please answer the following questions</b>")
-									ps.push(user_input(parameter+" >"))
+									info("Cant find /etc/passwd")
 								end if
 							end for
+
 						end if
-						
-						if ps.len == 0 then
-							res = metaLib.overflow(exploit.memory, exploit.string)
-						else if ps.len == 1 then
-							res = metaLib.overflow(exploit.memory, exploit.string, ps[0])
-						else if ps.len == 2 then
-							res = metaLib.overflow(exploit.memory, exploit.string, ps[0], ps[1])
-						else if ps.len == 3 then
-							res = metaLib.overflow(exploit.memory, exploit.string, ps[0], ps[1], ps[2])
-						else
-							error("Too many parameters")
-							return null
-						end if
-						if res != null then
-							type = typeof(res)
-							if type == "shell" then
-								sus = getUser(res.host_computer)
-								if sus == "root" then return getShell(res)
-								if globals.usr == "guest" then
-									if sus != "guest" then
-										return getShell(res)
+
+						if type == "computer" then
+
+							if globals.config.deleteLogs == true then
+								var = res.File("/var/system.log")
+								if var then
+									if var.has_permission("w") then
+										var.delete()
+										info("Logs deleted")
+									else
+										info("Cant delete logs")
 									end if
+								else
+									info("Cant find /var/system.log")
 								end if
 							end if
 
-							if type == "number" then
-								info("Password changed to '"+globals.config.passwdChange+"'")
-							end if
-
-							if type == "file" then
-								Root = NavToRoot(res)
-
-								passwds = FindFile("passwd",res,"pwd")
-								for passwd in passwds
-									if passwd and passwd != null then
-										Print(passwd)
-										cont = passwd.split("\n")
-										for c in cont
-											cc = c.split(":")
-											if cc.len == 2 then
-												if cc[0] == "root" then
-													p = GetPassword(cc)
-													if p != null then
-														shell = get_shell("root", p)
-														if shell then
-															info("Fake password")
-														else
-															return getShell(shell)
-														end if
+							passwds = FindFile("passwd",res)
+							for passwd in passwds
+								if passwd and passwd != null then
+									Print(passwd)
+									cont = passwd.split("\n")
+									for c in cont
+										cc = c.split(":")
+										if cc.len == 2 then
+											if cc[0] == "root" then
+												p = GetPassword(cc)
+												if p != null then
+													shell = get_shell("root", p)
+													if shell then
+														info("Fake password")
 													else
-														info("Fake password.")
+														return getShell(shell)
 													end if
+												else
+													info("Fake password.")
 												end if
 											end if
-										end for
-									else
-										info("Cant find /etc/passwd")
-									end if
-								end for
-
-							end if
-
-							if type == "computer" then
-
-								if globals.config.deleteLogs == true then
-									var = res.File("/var/system.log")
-									if var then
-										if var.has_permission("w") then
-											var.delete()
-											info("Logs deleted")
-										else
-											info("Cant delete logs")
 										end if
-									else
-										info("Cant find /var/system.log")
-									end if
+									end for
+								else
+									info("Cant find /etc/passwd")
 								end if
-
-								passwds = FindFile("passwd",res,"pwd")
-								for passwd in passwds
-									if passwd and passwd != null then
-										Print(passwd)
-										cont = passwd.split("\n")
-										for c in cont
-											cc = c.split(":")
-											if cc.len == 2 then
-												if cc[0] == "root" then
-													p = GetPassword(cc)
-													if p != null then
-														shell = get_shell("root", p)
-														if shell then
-															info("Fake password")
-														else
-															return getShell(shell)
-														end if
-													else
-														info("Fake password.")
-													end if
-												end if
-											end if
-										end for
-									else
-										info("Cant find /etc/passwd")
-									end if
-								end for			
-							end if
+							end for			
 						end if
-					end for
+					end if
 				end for
 			end for
-		else
-			dirs = findUnlockedDirs(globals.comp.File("/"),[])
-			if dirs.len > 0 then
-				ddir = null
-				for dir in dirs
-					if dir.has_permission("w") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("x") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("r") then ddir = dir
-					if dir.has_permission("w") and dir.has_permission("r") and dir.has_permission("x") then ddir = dir
-					if dir.parent.name == "." then ddir = dir.parent
-				end for
-
-				mkd = globals.comp.create_folder(ddir.path, ".")
-				if mkd == 1 then
-					dir = globals.comp.File(ddir.path+"/.")
-					x = globals.hs.scp(program_path, dir.path, globals.shell)
-					if(x == 1) then
-						if not findLibrary("crypto.so",2) then
-							globals.hs.scp(findLibrary("crypto.so"), dir.path, globals.shell)
-						end if
-
-						if not findLibrary("metaxploit.so",2) then
-							globals.hs.scp(findLibrary("metaxploit.so"), dir.path, globals.shell)
-						end if
-
-						prgd = dir.path+"/"+globals.hc.File(program_path).name
-						if not globals.comp.File(prgd) then
-							globals.hs.scp(program_path, dir.path, globals.shell)
-						end if
-
-						args = [globals.login,"escalate"]
-						globals.shell.launch(prgd,args.join(" "))
-					end if
-				else
-					Print("Invalid Permissions.")
-				end if
-			else
-				Print("Unable to find vulnerable folder cant escalate.")
-			end if
-		end if
+		end for
 	end function
 
 	if globals.usr == "root" then
@@ -1918,7 +537,141 @@ Commands["escalate"]["Run"] = function(Args,pipe)
 	end if
 end function
 
-Commands["back"] = {"Name": "back","Description": "Goes back to the last shell.","Args": ""}
+
+Commands["getsystem"] = {"Name": "getsystem","Description": "Manual priv esc.","Args": "","Shell":false}
+Commands["getsystem"]["Run"] = function(args,pipe)
+
+	cryptools = loadLibrary("crypto.so",true)
+	if not cryptools then return error("Can't find crypto library")
+
+	metaxploit = loadLibrary("metaxploit.so",true)
+	if not metaxploit then return error("Can't find metaxploit library")
+
+	GetPassword = function(userPass)
+		if userPass.len != 2 then return error("wrong syntax")
+		password = cryptools.decipher(userPass[1])
+		if password then
+			return password
+		else
+			return null
+		end if
+	end function
+
+	passwd = globals.comp.File("/etc/passwd")
+	if passwd != null and passwd.has_permission("r") then
+		passwd = passwd.get_content
+		cont = passwd.split("\n")
+		for c in cont
+			cc = c.split(":")
+			if cc.len == 2 then
+				if cc[0] == "root" then
+					p = GetPassword(cc)
+					if p != null then
+						shell = get_shell("root", p)
+						if shell then
+							info("Fake password")
+						else
+							return getShell(shell)
+						end if
+					else
+						info("Fake password.")
+					end if
+				end if
+			end if
+		end for
+	else
+		info("Cant find /etc/passwd")
+	end if
+	
+
+	while 1
+		libs = FindFile("*.so",globals.comp)
+		metas = []
+		for lib in libs
+			lcomp = globals.comp
+			pName = lcomp.File(lib).parent.name
+			if pName == "lib" then
+				m = metaxploit.load(lib)
+				if m != null then
+					metas.push( {"public_ip": lcomp.public_ip, "local_ip": lcomp.local_ip, "port_number":-1, "metaLib":m} )
+				end if
+			end if
+		end for
+		
+		while 1
+			metaLib = chooseMetaLib(metas)
+			if not metaLib then return
+			
+			exploits = loadExploits(metaLib.metaLib)
+			
+			if exploits.len == 0 then
+				error("Sorry, there are no exploits for the entry point.  Try scanning for some.")
+				print("")
+				continue
+			end if
+			
+			break
+		end while
+
+		while 1
+			choices = ["\n\n<b>Choose which exploit you would like to use:</b>"]
+			exploits = loadExploits(metaLib.metaLib)
+			for exploit in exploits
+				stringToAdd = "<b> " + exploit.type + "</b>"
+				if exploit.hasIndex("requirements") then 
+					for requirement in exploit.requirements
+						stringToAdd = stringToAdd + "\n       " + requirement
+					end for
+				end if
+				choices.push(stringToAdd)
+			end for
+			choices.push("<i>Back.</i>")
+
+			userChoice = get_choice(choices, choices.len-1)
+			if userChoice > exploits.len then break
+			exploit = exploits[userChoice-1]
+
+			exploitObj = runExploit(exploit, metaLib.metaLib, "manual")
+			
+			if typeof(exploitObj) == "shell" or typeof(exploitObj) == "ftpshell" then
+				result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+				if result then
+					return getShell(exploitObj)
+				end if
+			else if typeof(exploitObj) == "computer" then
+				result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+				if result then
+					return getShell(exploitObj)
+				end if
+			else if typeof(exploitObj) == "file" then
+				choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
+				choices.push("Browse Files")
+				choices.push("Scan entire machine for passwords (and crack them)")
+				choices.push("Scan entire machine for vulnerable directories and files")
+				choices.push("Nothing.")
+				choice = get_choice(choices, choices.len-1)
+				if choice == choices.len-1 then break
+				if choice == 1 then
+					browseFiles(exploitObj)
+				else if choice == 2 then
+					while exploitObj.parent
+						exploitObj = exploitObj.parent
+					end while
+					crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
+					print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
+				else if choice == 3 then
+					while exploitObj.parent
+						exploitObj = exploitObj.parent
+					end while
+					findUnlocked(exploitObj)
+				end if
+			end if
+		end while
+	end while
+end function
+
+
+Commands["back"] = {"Name": "back","Description": "Goes back to the last shell.","Args": "","Shell":false}
 Commands["back"]["Run"] = function(args,pipe)
 	globals.shell = globals.ls
 	globals.comp = globals.lc
@@ -1936,7 +689,44 @@ Commands["back"]["Run"] = function(args,pipe)
 	if sus == "root" then globals.path = "/root"
 end function
 
-Commands["up"] = {"Name": "up","Description": "Uploads a file.","Args": "[path]"}
+Commands["install"] = {"Name": "install","Description": "Uploads the script and libraries to the connected server.","Args": "","Shell":true}
+Commands["install"]["Run"] = function(args,pipe)
+	dirs = findUnlockedDirs(globals.comp.File("/"),[])
+	if dirs.len > 0 then
+		ddir = null
+		for dir in dirs
+			if dir.has_permission("w") then ddir = dir
+			if dir.has_permission("w") and dir.has_permission("x") then ddir = dir
+			if dir.has_permission("w") and dir.has_permission("r") then ddir = dir
+			if dir.has_permission("w") and dir.has_permission("r") and dir.has_permission("x") then ddir = dir
+			if dir.parent.name == "." then ddir = dir.parent
+		end for
+
+		mkd = globals.comp.create_folder(ddir.path, ".")
+		if mkd == 1 then
+			dir = globals.comp.File(ddir.path+"/.")
+			x = globals.hs.scp(program_path, dir.path, globals.shell)
+			if(x == 1) then
+				if not findLibrary("crypto.so",2) then
+					globals.hs.scp(findLibrary("crypto.so"), dir.path, globals.shell)
+				end if
+
+				if not findLibrary("metaxploit.so",2) then
+					globals.hs.scp(findLibrary("metaxploit.so"), dir.path, globals.shell)
+				end if
+
+				prgd = dir.path+"/"+globals.hc.File(program_path).name
+				if not globals.comp.File(prgd) then
+					globals.hs.scp(program_path, dir.path, globals.shell)
+				end if
+			end if
+		else
+			Print("Invalid Permissions.")
+		end if
+	end if
+end function
+
+Commands["up"] = {"Name": "up","Description": "Uploads a file.","Args": "[path]","Shell":false}
 Commands["up"]["Run"] = function(args,pipe)
 	pathFile = args[0]
 
@@ -1952,12 +742,12 @@ Commands["up"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["dl"] = {"Name": "dl","Description": "Downloads a file.","Args": "[path]"}
+Commands["dl"] = {"Name": "dl","Description": "Downloads a file.","Args": "[path]","Shell":false}
 Commands["dl"]["Run"] = function(args,pipe)
 	pathFile = args[0]
 
-	file = globals.shell.host_computer.File(pathFile)
-	if file == null then file = globals.shell.host_computer.File(path+"/"+pathFile)
+	file = globals.comp.File(pathFile)
+	if file == null then file = globals.comp.File(path+"/"+pathFile)
 	if file == null then return error("file not found: "+pathFile)
 
 	Print("Saving file to: /root/Downloads/"+file.name)
@@ -1969,12 +759,12 @@ Commands["dl"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["cat"] = {"Name": "cat","Description": "Shows the contents of a text file.","Args": "[file]"}
+Commands["cat"] = {"Name": "cat","Description": "Shows the contents of a text file.","Args": "[file]","Shell":false}
 Commands["cat"]["Run"] = function(params,pipe)
 	pathFile = params[0]
 	if pipe then pathFile = pipe
-	file = globals.shell.host_computer.File(pathFile)
-	if file == null then file = globals.shell.host_computer.File(path+"/"+pathFile)
+	file = globals.comp.File(pathFile)
+	if file == null then file = globals.comp.File(path+"/"+pathFile)
 	if file == null then return error("file not found: "+pathFile)
 	if file.is_binary then return error("can't open "+file.path+". Binary file")	
 	if not file.has_permission("r") then return error("permission denied")
@@ -1982,7 +772,7 @@ Commands["cat"]["Run"] = function(params,pipe)
 	return Print(file.get_content)
 end function
 
-Commands["rm"] = {"Name": "rm","Description": "Delete any file if you have the appropriate permissions.","Args": "[(opt) -r] [file]"}
+Commands["rm"] = {"Name": "rm","Description": "Delete any file if you have the appropriate permissions.","Args": "[(opt) -r] [file]","Shell":false}
 Commands["rm"]["Run"] = function(args,pipe)
 	pathFile = args[0]
 	if pipe then pathFile = pipe
@@ -1991,7 +781,7 @@ Commands["rm"]["Run"] = function(args,pipe)
 		isRecursive = 1
 		pathFile = args[1]
 	end if
-	file = globals.shell.host_computer.File(pathFile)
+	file = globals.comp.File(pathFile)
 		
 	if file == null then return error("file not found: "+pathFile)
 	if not file.has_permission("w") then return error("permission denied")
@@ -2002,7 +792,7 @@ Commands["rm"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["iwlist"] = {"Name": "iwlist","Description": "Shows the list of wifi networks visible from your computer.","Args": ""}
+Commands["iwlist"] = {"Name": "iwlist","Description": "Shows the list of wifi networks visible from your computer.","Args": "","Shell":false}
 Commands["iwlist"]["Run"] = function(params,pipe)
 	c = globals.comp
 
@@ -2046,7 +836,7 @@ Commands["iwlist"]["Run"] = function(params,pipe)
 	end for
 end function
 
-Commands["wifi"] = {"Name": "wifi","Description": "Hacks the specified wifi or the one with the highest connection.","Args": "[(opt) essid]"}
+Commands["wifi"] = {"Name": "wifi","Description": "Hacks the specified wifi or the one with the highest connection.","Args": "[(opt) essid]","Shell":false}
 Commands["wifi"]["Run"] = function(params,pipe)
 
 	w = ""
@@ -2118,7 +908,7 @@ Commands["wifi"]["Run"] = function(params,pipe)
 	return Print(C.o+"Connected, Creds: "+C.r+essid+":"+pass)
 end function
 
-Commands["sudo"] = {"Name": "sudo","Description": "It allows users to run programs with administrator security privileges.","Args": "[(opt) -s] [command]"}
+Commands["sudo"] = {"Name": "sudo","Description": "It allows users to run programs with administrator security privileges.","Args": "[(opt) -s] [command]","Shell":false}
 Commands["sudo"]["Run"] = function(Args,pipe)
 	inputPass = user_input("Password: ", true)
 	if Args[0] == "-u" then
@@ -2149,7 +939,7 @@ Commands["sudo"]["Run"] = function(Args,pipe)
 	end if
 end function
 
-Commands["grep"] = {"Name": "grep","Description": "Looks for text in a string.","Args": "[search] [string]"}
+Commands["grep"] = {"Name": "grep","Description": "Looks for text in a string.","Args": "[search] [string]","Shell":false}
 Commands["grep"]["Run"] = function(Args,pipe)
 	if pipe then Args.push(pipe)
 	search = Args[0]
@@ -2171,7 +961,7 @@ Commands["grep"]["Run"] = function(Args,pipe)
 	end if
 end function
 
-Commands["crack"] = {"Name": "crack","Description": "Cracks a hash.","Args": "[hash]"}
+Commands["crack"] = {"Name": "crack","Description": "Cracks a hash.","Args": "[hash]","Shell":false}
 Commands["crack"]["Run"] = function(Args,pipe)
 	crypto = loadLibrary("crypto.so",true)
 	if not crypto then return error("Can't find crypto library")
@@ -2195,35 +985,7 @@ Commands["crack"]["Run"] = function(Args,pipe)
 	return Print(out)
 end function
 
-Commands["rshells"] = {"Name": "rshells","Description": "Terminal interface to interact with the installed rshell server and manage incoming connections.","Args": ""}
-Commands["rshells"]["Run"] = function(args,pipe)
-	metaxploit = loadMetaXPloit()
-	if not metaxploit then exit("Error: Can't find metaxploit library")
-	Print("Listening for upcoming connections...")
-
-	shells = []
-	while shells.len == 0	
-		shells = metaxploit.rshell_server
-		if(typeof(shells) == "string") then exit(shells)	
-		if(shells.len == 0) then wait(2)
-	end while
-
-	option = 0
-	while typeof(option) !=  "number" or (option < 1 or option > shells.len)
-		Print(shells.len + " shell(s) connected!\n<b>Select a shell to start a terminal:</b>")
-		for i in range(0, shells.len - 1)
-			shel = shells[i]
-			wlsys(shel)
-			Print("\n<b>Shell (" + (i + 1) + ")</b>\nUser: "+ uparse(getUser(shel.host_computer)) +"\nPublic IP: " + shel.host_computer.public_ip + "\nLocal IP: " + shel.host_computer.local_ip)
-		end for
-		Print("-----------")
-		option = user_input("Select shell>").to_int
-	end while
-	Print("Starting shell #" + option)
-	return getShell(shells[option - 1])
-end function
-
-Commands["sniff"] = {"Name": "sniff","Description": "The terminal listens to the network packets of any connection that passes through this device.","Args": "[(opt) saveEncSource]"}
+Commands["sniff"] = {"Name": "sniff","Description": "The terminal listens to the network packets of any connection that passes through this device.","Args": "[(opt) saveEncSource]","Shell":false}
 Commands["sniff"]["Run"] = function(params,pipe)
 
 	metaxploit = loadMetaXPloit()
@@ -2241,7 +1003,7 @@ Commands["sniff"]["Run"] = function(params,pipe)
 	end while
 end function
 
-Commands["kernel.panic"] = {"Name": "kernel.panic","Description": "Destroy everything (requires reboot).","Args": ""}
+Commands["kernel.panic"] = {"Name": "kernel.panic","Description": "Destroy everything (requires reboot).","Args": "","Shell":false}
 Commands["kernel.panic"]["Run"] = function(params,pipe)
 	reboot = null
 
@@ -2251,7 +1013,7 @@ Commands["kernel.panic"]["Run"] = function(params,pipe)
 	
 end function
 
-Commands["forkbomb"] = {"Name": "forkbomb","Description": "Fills up the ram.","Args": ""}
+Commands["forkbomb"] = {"Name": "forkbomb","Description": "Fills up the ram.","Args": "","Shell":false}
 Commands["forkbomb"]["Run"] = function(params,pipe)
 
 	rs = globals.rshell
@@ -2269,10 +1031,8 @@ Commands["forkbomb"]["Run"] = function(params,pipe)
 	Print(C.G+"Success!")
 end function
 
-Commands["files"] = {"Name": "files","Description": "File browser.","Args": ""}
+Commands["files"] = {"Name": "files","Description": "File browser.","Args": "","Shell":false}
 Commands["files"]["Run"] = function(params,pipe)
-
-	
 	while 1
 		choices = ["\n\n<b>Options:</b>"]
 		choices.push(C.y+"Browse through the files.")
@@ -2300,7 +1060,7 @@ Commands["files"]["Run"] = function(params,pipe)
 		else if choice == 4 then
 			messWithProcs(globals.comp)
 		else if choice == 5 then
-			crackAllFiles(globals.comp.File("/"), vul.metaLib.public_ip+" --> "+vul.metaLib.local_ip)
+			crackAllFiles(globals.comp.File("/"))
 			Print("Cracked passwords have been saved in <b><i>"+home_dir+"/crackedPasswords.txt</b></i>")
 		else if choice == 6 then
 			findUnlocked(globals.comp.File("/"))
@@ -2308,7 +1068,7 @@ Commands["files"]["Run"] = function(params,pipe)
 	end while
 end function
 
-Commands["nmap"] = {"Name": "nmap","Description": "Scans an ip/domain for ports and local ips.","Args": "[ip/domain]"}
+Commands["nmap"] = {"Name": "nmap","Description": "Scans an ip/domain for ports and local ips.","Args": "[ip/domain]","Shell":false}
 Commands["nmap"]["Run"] = function(args,pipe)
 	ip = args[0]
 	if pipe then ip = pipe
@@ -2338,7 +1098,7 @@ Commands["nmap"]["Run"] = function(args,pipe)
 	end if
 end function
 
-Commands["router"] = {"Name": "router","Description": "Scans the router for firewall rules.","Args": "[ip]"}
+Commands["router"] = {"Name": "router","Description": "Scans the router for firewall rules.","Args": "[ip]","Shell":false}
 Commands["router"]["Run"] = function(params,pipe)
 	ipAddress = params[0]
 	if pipe then ipAddress = pipe
@@ -2365,7 +1125,7 @@ Commands["router"]["Run"] = function(params,pipe)
 	return info
 end function
 
-Commands["ssh"] = {"Name": "ssh","Description": "Access to private servers through a back door.","Args": "[user@password] [ip] [(opt) port]"}
+Commands["ssh"] = {"Name": "ssh","Description": "Access to private servers through a back door.","Args": "[user@password] [ip] [(opt) port]","Shell":true}
 Commands["ssh"]["Run"] = function(args,pipe)
 	ip = args[1]
 	if pipe then args[0] = pipe
@@ -2388,7 +1148,7 @@ Commands["ssh"]["Run"] = function(args,pipe)
 	
 end function
 
-Commands["masterkey"] = {"Name": "masterkey","Description": "lol this is just op (if u have access)","Args": "[ip] [port]"}
+Commands["masterkey"] = {"Name": "masterkey","Description": "lol this is just op (if u have access)","Args": "[ip] [port]","Shell":false}
 Commands["masterkey"]["Run"] = function(args,pipe)
 	if pipe then args[0] = pipe
 
@@ -2404,7 +1164,7 @@ Commands["masterkey"]["Run"] = function(args,pipe)
 	
 end function
 
-Commands["echo"] = {"Name": "echo","Description": "Prints text.","Args": "[text]"}
+Commands["echo"] = {"Name": "echo","Description": "Prints text.","Args": "[text]","Shell":false}
 Commands["echo"]["Run"] = function(args,pipe)
 	if pipe then args[0] = pipe
 	text = args[0]
@@ -2412,17 +1172,119 @@ Commands["echo"]["Run"] = function(args,pipe)
 	return text
 end function
 
-Commands["secure"] = {"Name": "secure","Description": "Secures the connected system.", "Args": ""}
+Commands["secure"] = {"Name": "secure","Description": "Secures the connected system.","Args": "","Shell":false}
 Commands["secure"]["Run"] = function(args,pipe)
-	securesys(globals.shell)
+	securesys(globals.comp)
 end function
 
-Commands["scan"] = {"Name": "scan","Description": "Scans an ip/domain for vulns.","Args": "[ip/domain] [(opt) port]"}
+Commands["manual"] = {"Name": "manual","Description": "Manual scanning.","Args": "[ip/domain]","Shell":false}
+Commands["manual"]["Run"] = function(args,pipe)
+	ip = args[0]
+	port = null
+	ipAddr = null
+	localIp = null
+
+	globals.H = []
+
+	if not is_valid_ip(ip) then
+		if is_valid_ip(nslookup(ip)) then
+			ip = nslookup(ip)
+		else
+			return error("IP not found!")
+		end if
+	end if
+	ipAddr = ip
+
+		
+	while 1
+		if is_lan_ip(ipAddr) then
+			displayLocalMap(ipAddr)
+			metaLibs = extractMetaLibs(ipAddr)
+		else
+			router = getRouter(ipAddr)
+			displayRouterMap(router)
+			metaLibs = extractMetaLibs(router)
+		end if
+		
+		while 1
+			metaLib = chooseMetaLib(metaLibs)
+			if not metaLib then exit("Thanks for using NamelessOS")
+			
+			exploits = loadExploits(metaLib.metaLib)
+			
+			if exploits.len == 0 then
+				error("Sorry, there are no exploits for the entry point.  Try scanning for some.")
+				print("")
+				continue
+			end if
+			
+			break
+		end while
+
+		while 1
+			choices = ["\n\n<b>Choose which exploit you would like to use:</b>"]
+			exploits = loadExploits(metaLib.metaLib)
+			for exploit in exploits
+				stringToAdd = "<b> " + exploit.type + "</b>"
+				if exploit.hasIndex("requirements") then 
+					for requirement in exploit.requirements
+						stringToAdd = stringToAdd + "\n       " + requirement
+					end for
+				end if
+				choices.push(stringToAdd)
+			end for
+			choices.push("<i>Back.</i>")
+
+			userChoice = get_choice(choices, choices.len-1)
+			if userChoice > exploits.len then break
+			exploit = exploits[userChoice-1]
+
+			exploitObj = runExploit(exploit, metaLib.metaLib, "manual")
+			
+			if typeof(exploitObj) == "shell" or typeof(exploitObj) == "ftpshell" then
+				result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+				if result then
+					return getShell(exploitObj)
+				end if
+			else if typeof(exploitObj) == "computer" then
+				result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+				if result then
+					return getShell(exploitObj)
+				end if
+			else if typeof(exploitObj) == "file" then
+				choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
+				choices.push("Browse Files")
+				choices.push("Scan entire machine for passwords (and crack them)")
+				choices.push("Scan entire machine for vulnerable directories and files")
+				choices.push("Nothing.")
+				choice = get_choice(choices, choices.len-1)
+				if choice == choices.len-1 then break
+				if choice == 1 then
+					browseFiles(exploitObj)
+				else if choice == 2 then
+					while exploitObj.parent
+						exploitObj = exploitObj.parent
+					end while
+					crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
+					print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
+				else if choice == 3 then
+					while exploitObj.parent
+						exploitObj = exploitObj.parent
+					end while
+					findUnlocked(exploitObj)
+				end if
+			end if
+		end while
+	end while
+end function
+
+Commands["scan"] = {"Name": "scan","Description": "Scans an ip/domain for vulns.","Args": "[ip/domain] [(opt) port] [(opt) local ip]","Shell":false}
 Commands["scan"]["Run"] = function(args,pipe)
 	ip = args[0]
 	port = null
 	ipAddr = null
-	
+	localIp = null
+
 	globals.H = []
 
 	if not is_valid_ip(ip) then
@@ -2435,6 +1297,10 @@ Commands["scan"]["Run"] = function(args,pipe)
 	ipAddr = ip
 
 	if args.len == 2 then port = args[1]
+	if args.len == 3 then
+		port = args[1]
+		localIp = args[2]
+	end if
 	
 	metaxploit = loadMetaXPloit()
 
@@ -2448,8 +1314,8 @@ Commands["scan"]["Run"] = function(args,pipe)
 	end if
 
 	for metaLib in metaLibs
-		if port!=null then
-			if metaLib.port_number != port then continue
+		if port then
+			if str(metaLib.port_number) != str(port) then continue
 		end if
 
 		if loadExploits(metaLib.metaLib).len == 0 then
@@ -2457,9 +1323,12 @@ Commands["scan"]["Run"] = function(args,pipe)
 		end if
 		exploits = loadExploits(metaLib.metaLib)
 		
+		localIp = metaLibs.local_ip
+		if args.len == 3 then localIp = args[2]
+
 		exps = []
 		for exploit in exploits
-			exploitObj = runExploit(exploit, metaLib.metaLib, metaLib.local_ip)
+			exploitObj = runExploit(exploit, metaLib.metaLib, localIp)
 			exps.push(exploitObj)
 		end for
 
@@ -2469,7 +1338,7 @@ Commands["scan"]["Run"] = function(args,pipe)
 	return Print("Done Scanning! Run: 'exploits' for the found vulns")
 end function
 
-Commands["exploits"] = {"Name": "exploits","Description": "Lists all found vulns.","Args": ""}
+Commands["exploits"] = {"Name": "exploits","Description": "Lists all found vulns.","Args": "","Shell":false}
 Commands["exploits"]["Run"] = function(args,pipe)
 	idx = 0
 	for vul in globals.H
@@ -2498,7 +1367,7 @@ Commands["exploits"]["Run"] = function(args,pipe)
 	end for
 end function
 
-Commands["use"] = {"Name": "use","Description": "Uses a vuln.","Args": "[id]"}
+Commands["use"] = {"Name": "use","Description": "Uses a vuln.","Args": "[id]","Shell":false}
 Commands["use"]["Run"] = function(args,pipe)
 	idx = 0
 	for vul in globals.H
@@ -2566,7 +1435,110 @@ Commands["use"]["Run"] = function(args,pipe)
 	end for
 end function
 
-Commands["sys"] = {"Name": "sys","Description": "System shell.","Args": ""}
+Commands["nc"] = {"Name":"nc","Description":"Netcat used for rshells","Args":"[(opt) command] [(opt) option] [(opt) ip] [(opt) port]","Shell":false}
+Commands["nc"]["Run"] = function(params,pipe)
+	metaxploit = loadMetaXPloit
+	
+	if not metaxploit then return error("Error: metaxploit.so not found!")
+	
+	if params.len < 1 then
+		return Print("Netcat\n\nnc -nlvp PORT | nc -lvnp PORT -- Listen for connections\nnc -c bash IP PORT | nc -c bash IP PORT -- Start terminal")
+	end if
+	
+	checkForRShell = function(ipAddr, checkPort)
+		router = get_router(ipAddr)
+		ports = router.used_ports
+		
+		if ports == null then return false
+		if typeof(ports) == "string" then return false
+		
+		if(ports.len == 0) then return false
+	
+		for port in ports
+			service_info = router.port_info(port)
+			lan_ips = port.get_lan_ip
+	
+			if str(port.port_number) == checkPort then return true
+		end for
+	
+		return false
+	end function
+	
+	if params.len == 2 or params.len == 1 then
+		opt = params[0]
+	
+		oopt = opt
+		opt.remove("-")
+
+		if opt.indexOf("-") == -1 then return error("unknown command")
+		if opt.indexOf("l") == -1 then return error("unknown command")
+		if opt.indexOf("v") == -1 then return error("unknown command")
+		if opt.indexOf("n") == -1 then return error("unknown command")
+
+		if opt == "-nlvp" or opt == "-lvnp" then
+			ipAddr = globals.comp.public_ip
+			fileName = globals.comp.File(program_path).name
+
+			if opt.indexOf("p") == -1 then
+				print(fileName+": listening ...")
+			else
+				if params.len == 1 then return error("unknown command")
+
+				port = params[1]
+				if checkForRShell(ipAddr, port) == false then return error("Error: port not found")
+
+				print(fileName+": listening on "+ipAddr+" "+port+" ...")
+			end if
+	
+			shells = []
+			while shells.len == 0	
+				shells = metaxploit.rshell_server
+				if(typeof(shells) == "string") then return error(shells)	
+				if(shells.len == 0) then wait(2)
+			end while
+	
+			shell = shells[0]
+	
+			scomp = shell.host_computer
+	
+			print(fileName+": connected to "+scomp.public_ip+" : "+scomp.local_ip)
+	
+			output = scomp.show_procs
+			lines = output.split("\n")
+			for line in lines
+				proc = line.split(" ")
+				id = proc[1]
+				pName = proc[4]
+	
+				if pName == "dsession" then
+					scomp.close_program(id.to_int)
+				end if
+			end for
+	
+			getShell(shell)
+		end if
+	end if
+	
+	if params.len == 4 then
+		opt = params[0]
+		cmd = params[1]
+		ip = params[2]
+		port = params[3]
+	
+		if opt == "-c" and cmd == "bash" then
+			if checkForRShell(ip, port) == false then return error("ip/port not found")
+	
+			output = metaxploit.rshell_client(ip, port.to_int, "dsession")
+			if output != 1 then return error(output)
+	
+			return
+		end if
+	end if
+	
+	return error("unknown command")
+end function
+
+Commands["sys"] = {"Name": "sys","Description": "System shell.","Args": "","Shell":false}
 Commands["sys"]["Run"] = function(params,pipe)
 
 	system_shell = function()
@@ -2590,11 +1562,11 @@ Commands["sys"]["Run"] = function(params,pipe)
 		
 		
 		if args[0] == "decipher" then
-			crypto = loadLibrary("crypto.so")
+			crypto = loadLibrary("crypto.so",true)
 			if not crypto then return error("Error: Can't find crypto library")
 			
 			filename = args[1]
-			file = globals.shell.host_computer.File(filename)
+			file = globals.comp.File(filename)
 			if not file == null then
 				
 				logins = file.get_content.split("\n")
@@ -2616,7 +1588,7 @@ Commands["sys"]["Run"] = function(params,pipe)
 				Print(t.e+"NamelessOS cannot be sure that this command worked due to no root access"+C.e)	
 			end if
 			
-			securesys(globals.shell)
+			securesys(globals.comp)
 
 			Print(t.s+"NamelessOS has secured this machine.")
 			Print(t.e+"You have too run sudo an get root before you can do anything or your machine"+C.e)
@@ -2634,7 +1606,99 @@ Commands["sys"]["Run"] = function(params,pipe)
 	return system_shell
 end function
 
-if globals.ar then Commands[globals.ar].Run([],null)
+parseCmd = function(input)
+	cmds = input.split(";")
+	if cmds.len == 0 then cmds.push(input)
+
+	for cmd in cmds
+		pipes = cmd.split(":")
+		if pipes.len == 0 then pipes.push(cmd)
+		globals.lout = null
+
+		cpipe = 1
+		for pipe in pipes
+			globals.disable_print = true
+			if cpipe == pipes.len then
+				globals.disable_print = false
+			else
+				cpipe=cpipe+1
+			end if
+
+			args = pipe.split(" ")
+			cmdn = args[0].lower
+
+			args.pull
+			if Commands.hasIndex(cmdn) then
+				cmd = Commands[cmdn]
+
+				if cmd.Shell == 1 and globals.shellType == "computer" then
+					error("A shell is required for this command.")
+				end if
+
+				Args = cmd.Args.trim.replace("(opt) ","(opt)").split(" ")
+
+				usa = function()
+					msg = t.c+ cmd.Name+" "+t.p+" "+cmd.Args.trim +t.c+" -> "+t.t+ cmd.Description
+					
+					Print("Usage: "+msg)
+					globals.lout = null
+				end function
+
+				if cmd.Args.trim == "" then
+					if args.len == 1 then
+						if args[0] == "-h" or args[0] == "--help" then
+							usa
+							continue
+						end if
+					end if
+
+					globals.lout = cmd.Run(args,globals.lout)
+					continue
+				end if
+
+				ta=0
+				oa=0
+				ra=0
+				for arg in Args
+					arg=arg.replace("[","")
+					arg=arg.replace("]","")
+
+					if arg.indexOf("(opt)") == 0 then
+						oa=oa+1
+					else
+						ra=ra+1
+					end if
+					ta=ta+1
+				end for
+				
+				if globals.lout != null then
+					if ra == 1 and args.len < ra then
+						args.push(globals.lout)
+					end if
+					ra=ra-1
+					oa=oa+1
+				end if
+				
+				if (args.len < ra or args.len > ta) then
+					usa
+				else
+					if args.len == 1 then
+						if args[0] == "-h" or args[0] == "--help" then
+							usa
+							continue
+						end if
+					end if
+
+					globals.lout = cmd.Run(args,globals.lout)
+				end if
+			else
+				error("Command not found!")
+			end if
+		end for
+	end for
+end function
+
+if globals.ar then parseCmd(globals.ar)
 
 clear_screen
 
@@ -2642,95 +1706,11 @@ menu = function()
 	
 	namelessos = function()
 		globals.disable_print = false
-		cmdpTOP= "\n"+t.bd+"<s>•	</s> (" + uparse(usr) + t.p+"@"+t.ip+ comp.public_ip + "~" + comp.local_ip + t.bd + ")<s> </s>["+t.pa+ pparse(globals.ppath) +t.bd+"]"
+		cmdpTOP= "\n"+t.bd+"<s>•	</s> ("+uparse(usr)+t.p+":</color>"+globals.shellType+t.p+"@"+t.ip+ comp.public_ip + "~" + comp.local_ip + t.bd + ")<s> </s>["+t.pa+ pparse(globals.ppath) +t.bd+"]"
 		cmdpBTM= "\n"+t.bd+"<s>•		•</s>"+t.p+" $ " +C.e+t.i
 		input = user_input(cmdpTOP+cmdpBTM)
 
-		cmds = input.split(";")
-		if cmds.len == 0 then cmds.push(input)
-
-		for cmd in cmds
-			pipes = cmd.split(":")
-			if pipes.len == 0 then pipes.push(cmd)
-			globals.lout = null
-
-			cpipe = 1
-			for pipe in pipes
-				globals.disable_print = true
-				if cpipe == pipes.len then
-					globals.disable_print = false
-				else
-					cpipe=cpipe+1
-				end if
-
-				args = pipe.split(" ")
-				cmdn = args[0].lower
-
-				args.pull
-				if Commands.hasIndex(cmdn) then
-					cmd = Commands[cmdn]
-					Args = cmd.Args.trim.replace("(opt) ","(opt)").split(" ")
-
-					usa = function()
-						msg = t.c+ cmd.Name+" "+t.p+" "+cmd.Args.trim +t.c+" -> "+t.t+ cmd.Description
-						
-						Print("Usage: "+msg)
-						globals.lout = null
-					end function
-
-					if cmd.Args.trim == "" then
-						if args.len == 1 then
-							if args[0] == "-h" or args[0] == "--help" then
-								usa
-								continue
-							end if
-						end if
-
-						globals.lout = cmd.Run(args,globals.lout)
-						continue
-					end if
-
-					ta=0
-					oa=0
-					ra=0
-					for arg in Args
-						arg=arg.replace("[","")
-						arg=arg.replace("]","")
-
-						if arg.indexOf("(opt)") == 0 then
-							oa=oa+1
-						else
-							ra=ra+1
-						end if
-						ta=ta+1
-					end for
-					
-					if globals.lout != null then
-						if ra == 1 and args.len < ra then
-							args.push(globals.lout)
-						end if
-						ra=ra-1
-						oa=oa+1
-					end if
-					
-					if (args.len < ra or args.len > ta) then
-						usa
-					else
-						if args.len == 1 then
-							if args[0] == "-h" or args[0] == "--help" then
-								usa
-								continue
-							end if
-						end if
-
-						globals.lout = cmd.Run(args,globals.lout)
-					end if
-				else
-					error("Command not found!")
-				end if
-			end for
-		end for
-		
+		parseCmd(input)
 
 		namelessos
 	end function
