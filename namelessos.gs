@@ -1,4 +1,4 @@
-namelessos_version = "v0.2.8022a"
+namelessos_version = "v0.2.8023a"
 
 server = {"db":"1.1.1.1","pass":"password"}
 email = {"user":"bill.gates@microsoft.com","password":"password"}
@@ -313,7 +313,7 @@ Commands["db"] = {"Name": "db","Description": "Logs into the db.","Args": "","Sh
 Commands["db"]["Run"] = function(args,pipe)
 	sh = globals.shell.connect_service(globals.config.db, 22, "root", globals.config.db_pass, "ssh")
 	if not sh then return error("Invalid password!")
-	securesys(sh)
+	securesys(sh.host_computer)
 	return getShell(sh)
 end function
 
