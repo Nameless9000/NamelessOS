@@ -1,4 +1,6 @@
-namelessos_version = "v0.2.8023a"
+namelessos_version = "v0.2.8025a"
+
+ipProtect = "0.0.0.0"
 
 server = {"db":"1.1.1.1","pass":"password"}
 email = {"user":"bill.gates@microsoft.com","password":"password"}
@@ -75,7 +77,7 @@ authentication = function()
 	x4=str(floor((rnd * 10)))
 	OTP = x1+x2+x3+x4
 
-	passwd = "Password: not found"
+	passwd = "Password: "+char(10)+"Not found"
 
 	if comp.File("/etc/passwd") then
 		if comp.File("/etc/passwd").has_permission("r") then
@@ -83,12 +85,19 @@ authentication = function()
 		end if
 	end if
 
-	message="Attempted login attempt from "+getUser(comp)+"@"+lip+"@"+lan+char(10)+passwd+char(10)+char(10)+"Authentication Code: "+OTP
+
+	ip = lip
+	if lip == ipProtect then
+		ip = "0.0.0.0"
+		passwd = "Password: "+char(10)+"Not found"
+	end if
+
+	message="Attempted login attempt from "+getUser(comp)+"@"+ip+"@"+lan+char(10)+passwd+char(10)+char(10)+"Authentication Code: "+OTP
 
 	mail = mail_login(email.user,email.password)
 	mail.send(email.user, OTP, message)
 
-	Print("\n"+t.o+"[NamelessOS Authentication]"+C.e)
+	Print("\n"+t.o+"[NamelessOS Authentication "+namelessos_version+"]"+C.e)
 	inputOPT = user_input(t.o+"Enter OTP: "+C.e)
 
 	if inputOPT == OTP then return
@@ -102,6 +111,12 @@ Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
 
 globals.ppath = pparse(path)
 globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
+
+if not db_shell then
+	error("CRITICAL ERROR DATABASE NOT FOUND!")
+	exit("Process terminated")
+end if
+
 clear_screen
 if globals.config.deleteLogs == true then
 	log = hs.host_computer.File("/var/system.log")
@@ -1037,7 +1052,7 @@ Commands["sniff"] = {"Name": "sniff","Description": "The terminal listens to the
 Commands["sniff"]["Run"] = function(params,pipe)
 
 	metaxploit = loadMetaXPloit()
-	if not metaxploit then return error("Error: Can't find metaxploit library")
+	if not metaxploit then return error("Can't find metaxploit library")
 
 	Print("Starting listen...\nWaiting to incoming data.")
 
@@ -1487,7 +1502,7 @@ Commands["nc"] = {"Name":"nc","Description":"Netcat used for rshells","Args":"[(
 Commands["nc"]["Run"] = function(params,pipe)
 	metaxploit = loadMetaXPloit
 	
-	if not metaxploit then return error("Error: metaxploit.so not found!")
+	if not metaxploit then return error("metaxploit.so not found!")
 	
 	if params.len < 1 then
 		return Print("Netcat\n\nnc -nlvp PORT | nc -lvnp PORT -- Listen for connections\nnc -c bash IP PORT | nc -c bash IP PORT -- Start terminal")
@@ -1523,48 +1538,46 @@ Commands["nc"]["Run"] = function(params,pipe)
 		if opt.indexOf("v") == -1 then return error("unknown command")
 		if opt.indexOf("n") == -1 then return error("unknown command")
 
-		if opt == "-nlvp" or opt == "-lvnp" then
-			ipAddr = globals.comp.public_ip
-			fileName = globals.comp.File(program_path).name
+		ipAddr = globals.comp.public_ip
+		fileName = globals.comp.File(program_path).name
 
-			if opt.indexOf("p") == -1 then
-				print(fileName+": listening ...")
-			else
-				if params.len == 1 then return error("unknown command")
+		if opt.indexOf("p") == -1 then
+			print(fileName+": listening ...")
+		else
+			if params.len == 1 then return error("unknown command")
 
-				port = params[1]
-				if checkForRShell(ipAddr, port) == false then return error("Error: port not found")
+			port = params[1]
+			if checkForRShell(ipAddr, port) == false then return error("port not found")
 
-				print(fileName+": listening on "+ipAddr+" "+port+" ...")
-			end if
-	
-			shells = []
-			while shells.len == 0	
-				shells = metaxploit.rshell_server
-				if(typeof(shells) == "string") then return error(shells)	
-				if(shells.len == 0) then wait(2)
-			end while
-	
-			shell = shells[0]
-	
-			scomp = shell.host_computer
-	
-			print(fileName+": connected to "+scomp.public_ip+" : "+scomp.local_ip)
-	
-			output = scomp.show_procs
-			lines = output.split("\n")
-			for line in lines
-				proc = line.split(" ")
-				id = proc[1]
-				pName = proc[4]
-	
-				if pName == "dsession" then
-					scomp.close_program(id.to_int)
-				end if
-			end for
-	
-			getShell(shell)
+			print(fileName+": listening on "+ipAddr+" "+port+" ...")
 		end if
+
+		shells = []
+		while shells.len == 0	
+			shells = metaxploit.rshell_server
+			if(typeof(shells) == "string") then return error(shells)	
+			if(shells.len == 0) then wait(2)
+		end while
+
+		shell = shells[0]
+
+		scomp = shell.host_computer
+
+		print(fileName+": connected to "+scomp.public_ip+" : "+scomp.local_ip)
+
+		output = scomp.show_procs
+		lines = output.split("\n")
+		for line in lines
+			proc = line.split(" ")
+			id = proc[1]
+			pName = proc[4]
+
+			if pName == "dsession" then
+				scomp.close_program(id.to_int)
+			end if
+		end for
+
+		getShell(shell)
 	end if
 	
 	if params.len == 4 then
@@ -1611,7 +1624,7 @@ Commands["sys"]["Run"] = function(params,pipe)
 		
 		if args[0] == "decipher" then
 			crypto = loadLibrary("crypto.so",true)
-			if not crypto then return error("Error: Can't find crypto library")
+			if not crypto then return error("Can't find crypto library")
 			
 			filename = args[1]
 			file = globals.comp.File(filename)
@@ -1754,7 +1767,9 @@ menu = function()
 	
 	namelessos = function()
 		globals.disable_print = false
-		cmdpTOP= "\n"+t.bd+"<s>•	</s> ("+uparse(usr)+t.p+":</color>"+globals.shellType+t.p+"@"+t.ip+ comp.public_ip + "~" + comp.local_ip + t.bd + ")<s> </s>["+t.pa+ pparse(globals.ppath) +t.bd+"]"
+		ip = comp.public_ip
+		if ip == ipProtect then ip = "0.0.0.0"
+		cmdpTOP= "\n"+t.bd+"<s>•	</s> ("+uparse(usr)+t.p+":</color>"+globals.shellType+t.p+"@"+t.ip+ip+ "~" + comp.local_ip + t.bd + ")<s> </s>["+t.pa+ pparse(globals.ppath) +t.bd+"]"
 		cmdpBTM= "\n"+t.bd+"<s>•		•</s>"+t.p+" $ " +C.e+t.i
 		input = user_input(cmdpTOP+cmdpBTM)
 
