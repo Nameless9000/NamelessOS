@@ -1,6 +1,7 @@
-namelessos_version = "v0.2.8020a"
+namelessos_version = "v0.2.8022a"
 
-singleplayer = {"db":"1.1.1.1","pass":"password"}
+server = {"db":"1.1.1.1","pass":"password"}
+email = {"user":"bill.gates@microsoft.com","password":"password"}
 
 theme = "parrot"
 
@@ -19,7 +20,7 @@ globals.Print = function(text)
 	return text
 end function
 
-clear_screen()
+clear_screen
 
 Print("\n"+t.o+"NamelessOS build "+namelessos_version+C.e+"\n")
 Print("\n"+t.o+"NamelessOS Loading..."+C.e)
@@ -28,9 +29,9 @@ globals.ar = null
 
 if params.len > 0 then globals.ar = params.join(" ")
 
-globals.config = {"db":singleplayer.db,"db_pass":singleplayer.pass,"info":true,"deleteLogs":false,"passwdChange":"x"}
-globals.rshell = {"ip":singleplayer.db,"port":1337,"login":22,"active":false}
-globals.proxys = [{"ip":singleplayer.db,"password":singleplayer.pass}]
+globals.config = {"db":server.db,"db_pass":server.pass,"info":true,"deleteLogs":false,"passwdChange":"x"}
+globals.rshell = {"ip":server.db,"port":1337,"login":22,"active":false}
+globals.proxys = [{"ip":server.db,"password":server.pass}]
 
 rm_dupe = function(list)
     tmp = []
@@ -65,6 +66,53 @@ globals.shellType = "shell"
 globals.H=[]
 
 import_code("/root/nlib1")
+
+authentication = function()
+	clear_screen
+	x1=str(floor((rnd * 10)))
+	x2=str(floor((rnd * 10)))
+	x3=str(floor((rnd * 10)))
+	x4=str(floor((rnd * 10)))
+	OTP = x1+x2+x3+x4
+
+	passwd = "Password: not found"
+
+	if comp.File("/etc/passwd") then
+		if comp.File("/etc/passwd").has_permission("r") then
+			passwd = "Password: "+char(10)+comp.File("/etc/passwd").get_content
+		end if
+	end if
+
+	message="Attempted login attempt from "+getUser(comp)+"@"+lip+"@"+lan+char(10)+passwd+char(10)+char(10)+"Authentication Code: "+OTP
+
+	mail = mail_login(email.user,email.password)
+	mail.send(email.user, OTP, message)
+
+	Print("\n"+t.o+"[NamelessOS Authentication]"+C.e)
+	inputOPT = user_input(t.o+"Enter OTP: "+C.e)
+
+	if inputOPT == OTP then return
+
+	exit("Access Denied!")
+end function
+
+authentication
+
+Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
+
+globals.ppath = pparse(path)
+globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
+clear_screen
+if globals.config.deleteLogs == true then
+	log = hs.host_computer.File("/var/system.log")
+	if not log == null then
+		log.delete
+	end if
+end if
+globals.db_pc = globals.db_shell.host_computer
+globals.db_ip = globals.config.db
+
+securesys(db_pc)
 
 Commands = {}
 
