@@ -835,7 +835,6 @@ getShell = function(SHELL)
 		globals.ppath = "/"
 	end if
 	if sus == "root" then globals.path = "/root"
-	rshell_c()
 	if globals.config.deleteLogs == true then
 		log = globals.comp.File("/var/system.log")
 		if not log == null and log.has_permission("w") then
