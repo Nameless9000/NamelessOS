@@ -106,44 +106,6 @@ ScanComputer = function(computer)
 	return output
 end function
 
-loginCheck = function(user,pass)
-	if globals.login then
-		sp = globals.login.split(":")
-		if sp.len == 2 then
-			user = sp[0]
-			pass = sp[1]
-			for login in globals.logins
-				if login.key == user then
-					if login.value == pass then
-						return true
-					end if
-				end if
-			end for
-		end if
-	end if
-	if pass then
-		for login in globals.logins
-			if login.key == user then
-				if login.value == pass then
-					globals.login = user+":"+pass
-					return true
-				end if
-			end if
-		end for
-	else
-		if user then
-			for login in globals.logins
-				if login.key == user then
-					return true
-				end if
-			end for
-		end if
-	end if
-	return false
-end function
-
-Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
-
 wlsys = function(ccomp)
 	if globals.config.deleteLogs == true then
 		log = ccomp.File("/var/system.log")
@@ -238,19 +200,6 @@ securesys = function(ccomp)
 	ccomp.File("/usr/bin/Terminal.exe").chmod("g+x")
 end function
 
-globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
-clear_screen
-if globals.config.deleteLogs == true then
-	log = hs.host_computer.File("/var/system.log")
-	if not log == null then
-		log.delete
-	end if
-end if
-globals.db_pc = globals.db_shell.host_computer
-globals.db_ip = globals.config.db
-
-securesys(db_pc)
-
 uparse = function(ur)
 	if ur == "root" then return t.root+"root"
 	if ur == "guest" then return t.guest+"guest"
@@ -266,8 +215,6 @@ pparse = function(pat)
 
 	return ret
 end function
-
-globals.ppath = pparse(path)
 
 getUser = function(computer,isF)
 	su = "?"
