@@ -1,4 +1,4 @@
-namelessos_version = "v0.2.8037a"
+namelessos_version = "v0.2.8040a"
 
 theme = "parrot"
 
