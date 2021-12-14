@@ -346,7 +346,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 		passwds = FindFile("passwd",globals.comp)
 		for passwd in passwds
 			if passwd != null then
-				cont = passwd.split("\n")
+				cont = passwd.split(char(10))
 				for c in cont
 					cc = c.split(":")
 					if cc.len == 2 then
@@ -440,7 +440,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 							for passwd in passwds
 								if passwd and passwd != null then
 									Print(passwd)
-									cont = passwd.split("\n")
+									cont = passwd.split(char(10))
 									for c in cont
 										cc = c.split(":")
 										if cc.len == 2 then
@@ -505,7 +505,7 @@ Commands["getsystem"]["Run"] = function(args,pipe)
 	passwd = globals.comp.File("/etc/passwd")
 	if passwd != null and passwd.has_permission("r") then
 		passwd = passwd.get_content
-		cont = passwd.split("\n")
+		cont = passwd.split(char(10))
 		for c in cont
 			cc = c.split(":")
 			if cc.len == 2 then
@@ -890,8 +890,8 @@ Commands["grep"]["Run"] = function(Args,pipe)
 	search = Args[0]
 	input = Args[1]
 
-	if input.split("\n").len != 0 then
-		lines = input.split("\n")
+	if input.split(char(10)).len != 0 then
+		lines = input.split(char(10))
 		f = []
 		for line in lines
 			if line.split(search).len >= 2 then f.push(line)
@@ -1448,7 +1448,7 @@ Commands["nc"]["Run"] = function(params,pipe)
 		print(fileName+": connected to "+scomp.public_ip+" : "+scomp.local_ip)
 
 		output = scomp.show_procs
-		lines = output.split("\n")
+		lines = output.split(char(10))
 		for line in lines
 			proc = line.split(" ")
 			id = proc[1]
@@ -1512,7 +1512,7 @@ Commands["sys"]["Run"] = function(params,pipe)
 			file = globals.comp.File(filename)
 			if not file == null then
 				
-				logins = file.get_content.split("\n")
+				logins = file.get_content.split(char(10))
 				for login in logins
 					info = login.split(":")
 					accnum = info[0]
