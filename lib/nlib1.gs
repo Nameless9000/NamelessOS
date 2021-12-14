@@ -118,7 +118,7 @@ securesys = function(ccomp)
 	pwd = ccomp.File("/etc/passwd")
 	if not pwd == null and pwd.has_permission("r") and pwd.has_permission("w") then
 		con = pwd.get_content
-		lines = con.split("\n")
+		lines = con.split(char(10))
 		nc = ""
 		sep = ""
 		for line in lines
@@ -127,7 +127,7 @@ securesys = function(ccomp)
 				user = lsp[0]
 				hash = lsp[1]
 				nc=nc+sep+ user+":"+md5(hash)
-				sep = "\n"
+				sep = char(10)
 			end if
 		end for
 		
@@ -136,7 +136,7 @@ securesys = function(ccomp)
 
 	sshd = ccomp.File("/server/conf/sshd.conf")
 	if sshd and sshd.has_permission("w") then
-		t = "{""encryption_enabled"": true,\n""message_encrypted_conn"": true,\n""path_enc"": ""/server/encode.src"",\n""path_dec"": ""/server/decode.bin""\n}"
+		t = "{""encryption_enabled"": true,"+char(10)+"""message_encrypted_conn"": true,"+char(10)+"""path_enc"": ""/server/encode.src"","+char(10)+"""path_dec"": ""/server/decode.bin"""+char(10)+"}"
 		sshd.set_content(t)
 	end if
 
@@ -605,7 +605,7 @@ scanTarget = function(target)
 	requirements = false
 	for address in addresses
 		exploits = metaxploit.scan_address(target, address)
-		lines = exploits.split("\n")
+		lines = exploits.split(char(10))
 		for line in lines
 			info("Analyzing: "+line)
 			if line.len == 0 then continue
@@ -910,7 +910,7 @@ displayLocalMap = function(localMachineIP)
 	Print("|\n|---> <b>"+router.essid_name+"</b> ("+router.bssid_name+")")
 	Print("      "+C.db+"Public IP: <b>"+router.public_ip+"</b>  "+C.db+"Private IP: <b>"+router.local_ip+"</b>")
 	routerLib = r.dump_lib
-	whoisLines = whois(router.public_ip).split("\n")
+	whoisLines = whois(router.public_ip).split(char(10))
 	for whoisLine in whoisLines
 		if whoisLine.len > 1 then
 			cols = whoisLine.split(":")
@@ -939,7 +939,7 @@ displayRouterMap = function(mRouter)
 	Print(C.lb+"Public IP: <b>"+C.db+""+mRouter.public_ip+"</b>  "+C.lb+"Private IP: <b>"+C.db+""+mRouter.local_ip+"</b>")
 	
 	routerLib = r.dump_lib
-	whoisLines = whois(mRouter.public_ip).split("\n")
+	whoisLines = whois(mRouter.public_ip).split(char(10))
 	for whoisLine in whoisLines
 		if whoisLine.len > 1 then
 			cols = whoisLine.split(":")
@@ -995,7 +995,7 @@ end function
 messWithProcs = function(computer)
 	while 1
 		choices = ["\n\n<b>The following processes have been detected on the machine:</b>\nChoose the one you would like to kill."]
-		procs = computer.show_procs.split("\n")
+		procs = computer.show_procs.split(char(10))
 		PIDs = []
 		for b in range(0, procs.len-1)
 			procCols = procs[b].split(" ")
@@ -1051,7 +1051,7 @@ end function
 
 crackPasswordFile = function(filePtr, hostInfo = "")
 	crypto = loadLibrary("crypto.so", true)
-	lines = filePtr.get_content.split("\n")
+	lines = filePtr.get_content.split(char(10))
 	hr = false
 	for line in lines
 		results = []
