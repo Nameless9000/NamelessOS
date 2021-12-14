@@ -74,7 +74,7 @@ globals.nlib1 = ""
 compConf = function()
     title
     comp = get_shell.host_computer
-    print("[Compiling]")
+    print("[Compiling] (Enter File Path)")
 
     globals.ninit = user_input("Enter exact path to ninit: ")
     if not comp.File(globals.ninit) then
@@ -102,7 +102,7 @@ globals.fname = "namelessos"
 fConf = function()
     title
     comp = get_shell.host_computer
-    print("[Finish]")
+    print("[Finish] (Enter File Path)")
 
     globals.fname = user_input("Enter name for NamelessOS: ")
 end function
@@ -138,16 +138,6 @@ print("Installed")
 print("Deleting temporary config file...")
 
 temp.delete
-
-print("Deleting library files...")
-
-comp.File(ninit).delete
-comp.File(nlib1).delete
-comp.File(nmain).delete
-
-print("Deleting installer...")
-
-comp.File(program_path).delete
 
 print("Launching NamelessOS...")
 
