@@ -65,9 +65,9 @@ Commands["help"]["Run"] = function(args,pipe)
 	Ret = "\n"+C.g+"Commands:"+C.e+"\n"
 
 	for Command in Commands
-		if Command.Shell == 1 and globals.shellType == "computer" then continue
-
 		CData = Command.value
+		if CData.Shell == 1 and globals.shellType == "computer" then continue
+
 		Ret = Ret+"		"+C.lc+ CData.Name +C.y+" "+ CData.Args.trim +C.lc+" -> "+C.o+ CData.Description+"\n"
 	end for
 
@@ -321,10 +321,10 @@ Commands["exit"]["Run"] = function(args,pipe)
 	return exit("Exiting NamelessOS...")
 end function
 
-Commands["escalate"] = {"Name": "escalate","Description": "Escalates your shell permissions.","Args": "[(opt) force]","Shell":false}
+Commands["escalate"] = {"Name": "escalate","Description": "Escalates your shell permissions.","Args": "[(opt) local ip]","Shell":false}
 Commands["escalate"]["Run"] = function(args,pipe)
-	force = false
-	if args.len == 1 and args[0] == "-f" then force = true
+	localip = globals.comp.local_ip
+	if args.len == 1 then localip = args[0]
 	
 	startev = function()
 		cryptools = loadLibrary("crypto.so",true)
@@ -352,7 +352,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 					if cc.len == 2 then
 						if cc[0] == "root" then
 							p = GetPassword(cc)
-							if p != null then
+							if p then
 								shell = get_shell("root", p)
 								if shell then
 									info("Fake password")
@@ -401,7 +401,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 					if exploit.hasIndex("parameters") then
 						for parameter in exploit.parameters
 							if parameter == "Local IP Address" then
-								ps.push(globals.comp.local_ip)
+								ps.push(localip)
 							else if parameter == "New Password" then
 								ps.push(globals.config.passwdChange)
 							else
@@ -425,14 +425,8 @@ Commands["escalate"]["Run"] = function(args,pipe)
 					end if
 					if res != null then
 						type = typeof(res)
-						if type == "shell" then
-							sus = getUser(res.host_computer)
-							if sus == "root" then return getShell(res)
-							if globals.usr == "guest" then
-								if sus != "guest" then
-									return getShell(res)
-								end if
-							end if
+						if type == "shell" and res.host_computer.local_ip == localip then
+							return getShell(res)
 						end if
 
 						if type == "number" then
@@ -472,49 +466,8 @@ Commands["escalate"]["Run"] = function(args,pipe)
 
 						end if
 
-						if type == "computer" then
-
-							if globals.config.deleteLogs == true then
-								var = res.File("/var/system.log")
-								if var then
-									if var.has_permission("w") then
-										var.delete()
-										info("Logs deleted")
-									else
-										info("Cant delete logs")
-									end if
-								else
-									info("Cant find /var/system.log")
-								end if
-							end if
-
-							passwds = FindFile("passwd",res)
-							for passwd in passwds
-								if passwd and passwd != null then
-									Print(passwd)
-									cont = passwd.split("\n")
-									for c in cont
-										cc = c.split(":")
-										if cc.len == 2 then
-											if cc[0] == "root" then
-												p = GetPassword(cc)
-												if p != null then
-													shell = get_shell("root", p)
-													if shell then
-														info("Fake password")
-													else
-														return getShell(shell)
-													end if
-												else
-													info("Fake password.")
-												end if
-											end if
-										end if
-									end for
-								else
-									info("Cant find /etc/passwd")
-								end if
-							end for			
+						if type == "computer" and res.local_ip == localip then
+							return getShell(res)	
 						end if
 					end if
 				end for
@@ -522,7 +475,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 		end for
 	end function
 
-	if globals.usr == "root" then
+	if globals.usr == "root" and localip == globals.comp.local_ip then
 		return Print("You already have root.")
 	else
 		return startev()
