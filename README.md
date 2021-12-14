@@ -3,7 +3,7 @@ My hacking tool.
 
 # How to install:
 
-1. compile all files in [/lib](https://github.com/Nameless9000/NamelessOS/tree/main/lib) with allow import on
+1. save or compile all files in [/lib](https://github.com/Nameless9000/NamelessOS/tree/main/lib) with allow import on
 2. rent a server
 3. compile [installer.gs](https://raw.githubusercontent.com/Nameless9000/NamelessOS/main/installer.gs)
 4. run installer.gs and fill in all inputs
@@ -19,3 +19,17 @@ My hacking tool.
 
 Remote hacking: 'manual'
 Local hacking: 'getsystem'
+
+## Compile manually
+
+1. save or compile all the files in [/lib](https://github.com/Nameless9000/NamelessOS/tree/main/lib) with allow import on
+2. rent a server
+3. compile this script with values inputted
+```lua
+globals.ipProtect="ip";
+globals.server={"db":"1.1.1.1","pass":"1234"};
+globals.email={"user":"x@x.com","password":"1234"};
+import_code("/lib/ninit");
+import_code("/lib/nlib1");
+import_code("/lib/nmain");
+```
