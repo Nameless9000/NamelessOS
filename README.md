@@ -16,3 +16,6 @@ My hacking tool.
 3. run 'secure' to secure your pc (you will need to manually secure your network)
 4. you can run commands one after the other eg. 'nmap 1.1.1.1;nc -lvnp 1337'
 5. you can feed the output of some commands to others eg. 'cat /etc/passwd:grep root:crack'
+
+Remote hacking: 'manual'
+Local hacking: 'getsystem'
