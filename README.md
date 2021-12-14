@@ -3,7 +3,7 @@ My hacking tool.
 
 # How to install:
 
-1. compile all files in (/lib)[https://github.com/Nameless9000/NamelessOS/tree/main/lib] with allow import on
+1. compile all files in [/lib](https://github.com/Nameless9000/NamelessOS/tree/main/lib) with allow import on
 2. rent a server
 3. compile [installer.gs](https://raw.githubusercontent.com/Nameless9000/NamelessOS/main/installer.gs)
 4. run installer.gs and fill in all inputs
