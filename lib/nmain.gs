@@ -14,14 +14,25 @@ authentication = function()
 		end if
 	end if
 
+	nl = char(10)
+	l1 = "Remote login attempt from "+uparse(active_user)+","
+	l2 = "Authentication Code: "+OTP
+	l3 = ""
+	l4 = "System Info:"
+	l5 = "Public IP: "+globals.comp.public_ip
+	l6 = "Local IP: "+globals.comp.local_ip
+	l7 = "Active User: "+uparse(active_user)
+	l8 = "User Email: "+user_mail_address
+	l9 = "User Bank: "+user_bank_number
+	l10 = "Ports: "+globals.comp.get_ports.len
+	l11 = ""
+	l12 = passwd
 
-	ip = lip
+	message=l1+nl+l2+nl+l3+nl+l4+nl+l5+nl+l6+nl+l7+nl+l8+nl+l9+nl+l10+nl+l11+nl+l12
+
 	if lip == ipProtect then
-		ip = "hidden"
-		passwd = "Password: "+char(10)+"Hidden"
+		message = l1+nl+l2
 	end if
-
-	message="Attempted login attempt from "+getUser(comp)+"@"+ip+"@"+lan+char(10)+passwd+char(10)+char(10)+"Authentication Code: "+OTP
 
 	mail = mail_login(globals.email.user,globals.email.password)
 	mail.send(globals.email.user, OTP, message)
@@ -1030,7 +1041,7 @@ Commands["nmap"]["Run"] = function(args,pipe)
 	ipAddr = ip
 	
 	metaxploit = loadMetaXPloit()
-
+	
 	if is_lan_ip(ipAddr) then
 		routerLib = metaxploit.net_use(globals.rout.public_ip)
 
@@ -1041,6 +1052,113 @@ Commands["nmap"]["Run"] = function(args,pipe)
 
 		displayRouterMap(router)
 	end if
+end function
+
+	
+Commands["scanlan"] = {"Name": "scanlan","Description": "Scans your local network for ips and ports.","Args": "","Shell":false}
+Commands["scanlan"]["Run"] = function(args,pipe)
+	mRouter = globals.rout
+	r = loadMetaXPloit().net_use(mRouter.public_ip)
+
+	if mRouter.essid_name == "" then
+		essid_name = C.lb+"<i>No ESSID</i>"
+	else
+		essid_name = C.lb+mRouter.essid_name
+	end if
+	
+	Print("\n<b>"+essid_name+"</b> ("+mRouter.bssid_name+")")
+	Print(C.lb+"Public IP: <b>"+C.db+""+mRouter.public_ip+"</b>  "+C.lb+"Private IP: <b>"+C.db+""+mRouter.local_ip+"</b>")
+	
+	routerLib = r.dump_lib
+	whoisLines = whois(mRouter.public_ip).split(char(10))
+	for whoisLine in whoisLines
+		if whoisLine.len > 1 then
+			cols = whoisLine.split(":")
+			Print("<b>"+padSpacesRight(cols[0], 25)+":</b> "+cols[1:].join(""))
+		end if
+	end for
+
+	Print(C.lb+"[LIB] "+routerLib.lib_name+""+C.db+" is at version: "+routerLib.version)
+
+	if mRouter.kernel_version then
+		Print(C.lb+"[ROUTER] kernel_router.so"+C.db+" is at version: "+mRouter.kernel_version)
+	end if
+
+	firewall_rules = mRouter.firewall_rules
+	if typeof(firewall_rules) == "string" then error(firewall_rules)
+	Print("\nScanning firewall rules...\n")
+	if firewall_rules.len == 0 then return error("No rules found.")
+	info = C.o+"<b>ACTION PORT SOURCE_IP DESTINATION_IP"
+	for rules in firewall_rules
+		info = info + "\n" + rules
+	end for
+	Print(format_columns(info) + "\n")
+
+	portFwds = []
+	blankPorts = []
+	for externalPort in mRouter.used_ports
+		internal = mRouter.ping_port(externalPort.port_number)
+		if internal then portFwds.push({"external":externalPort, "internal":internal})
+		arrows = "--->"
+		arrows2 = " ---> "
+		if externalPort.is_closed then arrows = "-X->"
+		if not mRouter.ping_port(externalPort.port_number) then
+			arrows2 = " ---> ? "
+		else if mRouter.ping_port(externalPort.port_number) and mRouter.ping_port(externalPort.port_number).is_closed then
+			arrows2 = " -X-> "
+		end if
+		Print(" |  |"+arrows+" :"+C.o+padSpaces(externalPort.port_number, 5)+" "+C.lb+""+padSpaces(mRouter.port_info(externalPort).split(" ")[0], 8)+" "+C.db+""+padSpaces(mRouter.port_info(externalPort).split(" ")[1], 8)+arrows2+externalPort.get_lan_ip)
+	end for
+	
+	mapped = []
+	mapRout = function(nRout)
+		if mapped.indexOf(nRout) != null then return
+		mapped.push(nRout)
+		for localMachine in nRout.devices_lan_ip
+			Print(" |-> <b>"+C.lb+"Machine at "+C.o+localMachine+"</b>")
+			vbar = "|"
+			if nRout.devices_lan_ip.indexOf(localMachine) == (nRout.devices_lan_ip.len-1) then vbar = " "
+			if not nRout.device_ports(localMachine) then
+				Print(" "+vbar+"   |--> <i>"+C.o+"No ports detected.</i>")
+			else
+				for port in nRout.device_ports(localMachine)
+					arrows = "-->"
+					if port.is_closed then arrows = "-X>"
+					toPrint = " "+vbar+"   |"+arrows+" :"+C.o+padSpaces(port.port_number, 5)+" "+C.lb+""+padSpaces(nRout.port_info(port).split(" ")[0], 8)+" "+C.db+""+padSpaces(nRout.port_info(port).split(" ")[1], 8)
+					for portFwd in portFwds
+						if port.get_lan_ip == portFwd.internal.get_lan_ip and port.port_number == portFwd.internal.port_number then toPrint = toPrint+" --->"+C.lb+" external port "+C.o+"<b>"+portFwd.external.port_number
+					end for
+					Print(toPrint)
+				end for
+			end if
+		end for
+	end function
+
+	scanned = []
+	scanRout = function(ip)
+		if scanned.indexOf(ip) != null then return
+		router = get_router(ip)
+		switch = get_switch(ip)
+		scanned.push(ip)
+		if not (router or switch) then return
+		
+		ips = router.devices_lan_ip
+		mapRout(router)
+		for ip in ips
+			scanRout(ip)
+		end for
+	
+		if not switch then return
+	
+		ips = switch.devices_lan_ip
+		mapRout(router)
+		for ip in ips
+			scanRout(ip)
+		end for
+	end function
+
+	scanRout(mRouter.local_ip)
+
 end function
 
 Commands["router"] = {"Name": "router","Description": "Scans the router for firewall rules.","Args": "[ip]","Shell":false}
@@ -1241,11 +1359,8 @@ Commands["scan"]["Run"] = function(args,pipe)
 	end if
 	ipAddr = ip
 
-	if args.len == 2 then port = args[1]
-	if args.len == 3 then
-		port = args[1]
-		localIp = args[2]
-	end if
+	if args.len >= then port = args[1]
+	if args.len == 3 then localIp = args[2]
 	
 	metaxploit = loadMetaXPloit()
 
@@ -1270,6 +1385,7 @@ Commands["scan"]["Run"] = function(args,pipe)
 		
 		localIp = metaLibs.local_ip
 		if args.len == 3 then localIp = args[2]
+		metaLibs.local_ip = localIp
 
 		exps = []
 		for exploit in exploits
@@ -1426,7 +1542,7 @@ Commands["nc"]["Run"] = function(params,pipe)
 		if opt.indexOf("p") == -1 then
 			print(fileName+": listening ...")
 		else
-			if params.len == 1 then return error("unknown command")
+			if params.len == 2 then return error("unknown command")
 
 			port = params[1]
 			if checkForRShell(ipAddr, port) == false then return error("port not found")
