@@ -200,9 +200,9 @@ securesys = function(ccomp)
 end function
 
 uparse = function(ur)
-	if ur == "root" then return t.root+"root"
-	if ur == "guest" then return t.guest+"guest"
-	if ur == "?" then return t.other+"secured"
+	if ur == "root" then return t.root+"root"+C.e
+	if ur == "guest" then return t.guest+"guest"+C.e
+	if ur == "?" then return t.other+"secured"+C.e
 	return t.user+ur
 end function
 
@@ -883,7 +883,7 @@ displayLocalMap = function(localMachineIP)
 	router = globals.rout
 	localPorts = router.device_ports(localMachineIP)
 	externalPorts = router.used_ports
-	
+
 	r = loadMetaXPloit().net_use(router.public_ip)
 
 	
