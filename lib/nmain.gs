@@ -1570,7 +1570,7 @@ Commands["nc"]["Run"] = function(params,pipe)
 			id = proc[1]
 			pName = proc[4]
 
-			if pName == "dsession" then
+			if pName == "ps" then
 				scomp.close_program(id.to_int)
 			end if
 		end for
@@ -1587,7 +1587,7 @@ Commands["nc"]["Run"] = function(params,pipe)
 		if opt == "-c" and cmd == "bash" then
 			if checkForRShell(ip, port) == false then return error("ip/port not found")
 	
-			output = metaxploit.rshell_client(ip, port.to_int, "dsession")
+			output = metaxploit.rshell_client(ip, port.to_int, "ps")
 			if output != 1 then return error(output)
 	
 			return
