@@ -1240,6 +1240,124 @@ Commands["secure"]["Run"] = function(args,pipe)
 	securesys(globals.comp)
 end function
 
+Commands["overflow"] = {"Name":"overflow","Description":"Overflow exploit.","Args":"[target] [port] [memory] [string] [(opt) arg1] [(opt) arg2] [(opt) arg3]","Shell":false}
+Commands["overflow"]["Run"] = function(args,pipe)
+	genScript = false
+	oldComp = globals.comp
+	oldPath = globals.path
+	genScript = get_yesno(false, "Do you want to generate a script for this exploit?")
+	
+	gScript = ""
+	port = args[1]
+
+	ipAddr = args[0]
+
+	if not is_valid_ip(ipAddr) then
+		if is_valid_ip(nslookup(ipAddr)) then
+			ipAddr = nslookup(ipAddr)
+		else
+			return error("IP not found!")
+		end if
+	end if
+
+	metaxploit = loadMetaXPloit
+	if not metaxploit then return error("metaxploit.so not found")
+
+	nsession = metaxploit.net_use
+	if not nsession then return error("cannot connect to target")
+
+	metalib = nsession.dump_lib
+
+	pars = args.len - 4
+
+	exploitObj = null
+
+	gScript = "include_lib(""/lib/metaxploit.so"").net_use("""+ipAddr+""","+port+").dump_lib"
+
+	if pars == 0 then
+		exploitObj = metalib.overflow(args[2], args[3])
+		gScript=gScript+".overflow("""+args[2]+""","""+args[3]+""")"
+	end if
+	if pars == 1 then
+		exploitObj = metalib.overflow(args[2], args[3], args[4])
+		gScript=gScript+".overflow("""+args[2]+""","""+args[3]+""","""+args[4]+""")"
+	end if
+	if pars == 2 then
+		exploitObj = metalib.overflow(args[2], args[3], args[4], args[5])
+		gScript=gScript+".overflow("""+args[2]+""","""+args[3]+""","""+args[4]+""","""+args[5]+""")"
+	end if
+	if pars == 3 then
+		exploitObj = metalib.overflow(args[2], args[3], args[4], args[5], args[6])
+		gScript=gScript+".overflow("""+args[2]+""","""+args[3]+""","""+args[4]+""","""+args[5]+""","""+args[6]+""")"
+	end if
+
+	info("Result is an object of type <i>"+typeof(exploitObj)+"</i>")
+
+	writeGSExploit = function(gScript)
+		f = oldComp.File(oldPath+"/"+args[3]+".src")
+		if f then f.delete
+
+		oldComp.touch(oldPath,args[3]+".src")
+
+		f = oldComp.File(oldPath+"/"+args[3]+".src")
+		f.set_content(gScript)
+
+		Print("Saved exploit at "+f.path)
+	end function
+
+	if typeof(exploitObj) == "shell" then
+		gScript="result = "+gScript+char(10)+"result.start_terminal"
+		writeGSExploit(gScript)
+		result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+		if result then
+			return getShell(exploitObj)
+		end if
+	end if
+	if typeof(exploitObj) == "computer" then
+		gScript="result = "+gScript+char(10)+"print(result.File(""/etc/passwd"").get_content)"
+		writeGSExploit(gScript)
+		result = get_yesno(false, typeof(exploitObj) + ": Are you sure you want to open it now?")
+		if result then
+			return getShell(exploitObj)
+		end if
+	end if
+	if typeof(exploitObj) == "file" then
+		gScript="result = "+gScript+char(10)+"n=function(f)if f.name!=""/"" then return n(f.parent) end if return f end function"
+		gScript=gScript+char(10)+"for f in n(result).get_folders if f.name == ""etc"" then for f in f.get_files if f.name == ""passwd"" then print(f.get_content) end for end for end if end for"
+		writeGSExploit(gScript)
+		choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
+		choices.push("Browse Files")
+		choices.push("Scan entire machine for passwords (and crack them)")
+		choices.push("Scan entire machine for vulnerable directories and files")
+		choices.push("Nothing.")
+		choice = get_choice(choices, choices.len-1)
+		if choice == choices.len-1 then
+			break
+		end if
+		if choice == 1 then
+			browseFiles(exploitObj)
+		end if
+		if choice == 2 then
+			while exploitObj.parent
+				exploitObj = exploitObj.parent
+			end while
+			crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
+			print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
+		end if
+		if choice == 3 then
+			while exploitObj.parent
+				exploitObj = exploitObj.parent
+			end while
+			findUnlocked(exploitObj)
+		end if
+	end if
+	if typeof(exploitObj) == "number" then
+		Print("Type: password or firewall.")
+	end if
+
+	return error("Exploit failed.")
+end function
+
 Commands["manual"] = {"Name": "manual","Description": "Manual scanning.","Args": "[ip/domain]","Shell":false}
 Commands["manual"]["Run"] = function(args,pipe)
 	ip = args[0]
@@ -1271,7 +1389,7 @@ Commands["manual"]["Run"] = function(args,pipe)
 		
 		while 1
 			metaLib = chooseMetaLib(metaLibs)
-			if not metaLib then exit("Thanks for using NamelessOS")
+			if not metaLib then break
 			
 			exploits = loadExploits(metaLib.metaLib)
 			
@@ -1299,7 +1417,9 @@ Commands["manual"]["Run"] = function(args,pipe)
 			choices.push("<i>Back.</i>")
 
 			userChoice = get_choice(choices, choices.len-1)
-			if userChoice > exploits.len then break
+			if userChoice > exploits.len then
+				break
+			end if
 			exploit = exploits[userChoice-1]
 
 			exploitObj = runExploit(exploit, metaLib.metaLib, "manual")
@@ -1321,7 +1441,9 @@ Commands["manual"]["Run"] = function(args,pipe)
 				choices.push("Scan entire machine for vulnerable directories and files")
 				choices.push("Nothing.")
 				choice = get_choice(choices, choices.len-1)
-				if choice == choices.len-1 then break
+				if choice == choices.len-1 then
+					break
+				end if
 				if choice == 1 then
 					browseFiles(exploitObj)
 				else if choice == 2 then
@@ -1359,7 +1481,7 @@ Commands["scan"]["Run"] = function(args,pipe)
 	end if
 	ipAddr = ip
 
-	if args.len >= then port = args[1]
+	if args.len >= 2 then port = args[1]
 	if args.len == 3 then localIp = args[2]
 	
 	metaxploit = loadMetaXPloit()
@@ -1375,7 +1497,9 @@ Commands["scan"]["Run"] = function(args,pipe)
 
 	for metaLib in metaLibs
 		if port then
-			if str(metaLib.port_number) != str(port) then continue
+			if str(metaLib.port_number) != str(port) then
+				continue
+			end if
 		end if
 
 		if loadExploits(metaLib.metaLib).len == 0 then
