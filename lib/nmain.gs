@@ -1263,7 +1263,7 @@ Commands["overflow"]["Run"] = function(args,pipe)
 	metaxploit = loadMetaXPloit
 	if not metaxploit then return error("metaxploit.so not found")
 
-	nsession = metaxploit.net_use
+	nsession = metaxploit.net_use(ipAddr,port)
 	if not nsession then return error("cannot connect to target")
 
 	metalib = nsession.dump_lib
@@ -1272,7 +1272,12 @@ Commands["overflow"]["Run"] = function(args,pipe)
 
 	exploitObj = null
 
+
 	gScript = "include_lib(""/lib/metaxploit.so"").net_use("""+ipAddr+""","+port+").dump_lib"
+
+	if port.to_int < 1 then
+		gScript = "include_lib(""/lib/metaxploit.so"").net_use("""+ipAddr+""").dump_lib"
+	end if
 
 	if pars == 0 then
 		exploitObj = metalib.overflow(args[2], args[3])
@@ -1651,11 +1656,7 @@ Commands["nc"]["Run"] = function(params,pipe)
 	
 	if params.len == 2 or params.len == 1 then
 		opt = params[0]
-	
-		oopt = opt
-		opt.remove("-")
-
-		if opt.indexOf("-") == -1 then return error("unknown command")
+		
 		if opt.indexOf("l") == -1 then return error("unknown command")
 		if opt.indexOf("v") == -1 then return error("unknown command")
 		if opt.indexOf("n") == -1 then return error("unknown command")
