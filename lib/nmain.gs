@@ -921,7 +921,6 @@ Commands["crack"] = {"Name": "crack","Description": "Cracks a hash.","Args": "[h
 Commands["crack"]["Run"] = function(Args,pipe)
 	crypto = loadLibrary("crypto.so",true)
 	if not crypto then return error("Can't find crypto library")
-	out = ""
 	login = Args[0]
 	if pipe then login = pipe
 	hashes=login
@@ -929,15 +928,25 @@ Commands["crack"]["Run"] = function(Args,pipe)
 		hashes=[login]
 	end if
 
+	newHashes = []
+
 	for hash in hashes
-		if login.split(":").len == 2 then login = login.split(":")[1]
-		got = crypto.decipher(login)
+		spl = hash.split(":")
+		if spl then hash = spl[1]
+
+		got = crypto.decipher(hash)
 		if got != null then
-			out=out+t.t+login+" -> "+got+"\n"
+			if spl then
+				newHashes.push(t.t+spl[0]+":"+got)
+			else
+				newHashes.push(t.t+hash+":"+got)
+			end if
 		else
-			out=out+t.t+login+" -> "+t.e+"Invalid Hash\n"
+			newHashes.push(t.t+hash+":"+t.e+"Invalid Hash")
 		end if
 	end for
+
+	out = newHashes.join(char(10))
 	return Print(out)
 end function
 
@@ -1363,14 +1372,115 @@ Commands["overflow"]["Run"] = function(args,pipe)
 	return error("Exploit failed.")
 end function
 
-Commands["manual"] = {"Name": "manual","Description": "Manual scanning.","Args": "[ip/domain]","Shell":false}
-Commands["manual"]["Run"] = function(args,pipe)
-	ip = args[0]
-	port = null
-	ipAddr = null
-	localIp = null
+Commands["cve-xp"] = {"Name":"cve-xp","Description":"Scan random ips for common vulnerabilites.","Args":"","Shell":false}
+Commands["cve-xp"]["Run"] = function(args,pipe)
+	cve = {"1.0.0":"NORMAL","1.0.1":"NORMAL","1.0.2":"MINOR","1.0.4":"MINOR","1.0.5":"NORMAL","1.0.6":"NORMAL","1.0.7":"NORMAL","1.0.8":"MINOR","1.1.1":"MINOR","1.1.3":"MINOR","1.1.4":"MINOR","1.1.5":"NORMAL","1.1.6":"NORMAL","1.2.0":"MINOR","1.2.1":"MINOR","1.2.5":"NORMAL","1.2.6":"NORMAL","1.2.7":"NORMAL","1.2.8":"NORMAL","1.3.2":"MINOR","1.3.3":"MINOR","1.3.4":"MINOR","1.3.5":"MINOR","1.3.6":"MINOR","1.3.7":"MINOR","1.3.8":"NORMAL","1.3.9":"MINOR"}
+	
+	random = function(min, max)
+		min = ceil(min);
+		max = floor(max);
+		return floor(rnd * (max - min + 1)) + min;
+	end function
+	
+	randomIp = function() 
+		return str(random(1,223))+"."+str(random(0,255))+"."+str(random(0,255))+"."+str(random(0,255))
+	end function
+	
+	title = function()
+		clear_screen
+		nl="</color>"+char(10)+"<color=#f1af45>"
+		t=nl
+		t=t+"####################################################################"+nl
+		t=t+"                                                        ,-.----.    "+nl
+		t=t+"  ,----..                 ,---,.          ,--,     ,--, \    /  \   "+nl
+		t=t+" /   /   \       ,---.  ,'  .' |          |'. \   / .`| |   :    \  "+nl
+		t=t+"|   :     :     /__./|,---.'   |    ,---,.; \ `\ /' / ; |   |  .\ : "+nl
+		t=t+".   |  ;. /,---.;  ; ||   |   .'  ,'  .' |`. \  /  / .' .   :  |: | "+nl
+		t=t+".   ; /--`/___/ \  | |:   :  |-,,---.'   , \  \/  / ./  |   |   \ : "+nl
+		t=t+";   | ;   \   ;  \ ' |:   |  ;/||   |    |  \  \.'  /   |   : .   / "+nl
+		t=t+"|   : |    \   \  \: ||   :   .':   :  .'     \  ;  ;   ;   | |`-'  "+nl
+		t=t+".   | '___  ;   \  ' .|   |  |-,:   |.'      / \  \  \  |   | ;     "+nl
+		t=t+"'   ; : .'|  \   \   ''   :  ;/|`---'       ;  /\  \    :   ' |     "+nl
+		t=t+"'   | '/  :   \   `  ;|   |    \         ./__;  \  ;  \ :   : :     "+nl
+		t=t+"|   :    /     :   \ ||   :   .'         |   : / \  \  ;|   | :     "+nl
+		t=t+" \   \ .'       '---' |   | ,'           ;   |/   \  ' |`---'.|     "+nl
+		t=t+"  `---`               `----'             `---'     `--`   `---`     "+nl
+		t=t+"####################################################################"+"</color>"
+		print(t)
+	end function
+	
+	title
+	
+	metaxploit = loadLibrary("metaxploit.so")
+	if not metaxploit then
+		error("Metaxploit Library not found.")
+		return
+	end if
+	
+	scans = user_input("How many ips to you want to scan: ")
+	if (not scans.to_int) or (scans.to_int < 0) then
+		error("You must enter a vaild number above 0.")
+		return
+	end if
+	scans = scans.to_int
+	
+	printRandom = get_yesno(false,"Do you want it print random versions? ")
+	
+	title
+	
+	Print("<color=#f1af45>Scanning...</color>")
+	
+	getVersions = function(tries)
+		versionMap = {}
+		versions = []
+	
+		for i in range(1,tries)
+			ipAddress = randomIp
+	
+			router = getRouter(ipAddress)
+			if not router then continue
+	
+			version = router.kernel_version
+	
+			if cve.hasIndex(version) then
+				if versions.indexOf(version) > 0 then continue
+				versions.push(version)
+				versionMap[version] = ipAddress
+				Print("<color=#f1af45>["+cve[version]+" CVE DETECTED]: "+ipAddress+"</color>")
+			else
+				if printRandom and not checked.hasIndex(version) then
+					if versions.indexOf(version) > 0 then continue
+					versions.push(version)
+					versionMap[version] = ipAddress
+					Print(version+":"+ipAddress)
+				end if
+			end if
+		end for
+	
+		v = globals.comp.File(globals.path+"/router_versions.txt")
+		
+		if v then
+			p = get_yesno(true,"Do you want to replace "+globals.path+"/router_versions.txt?")
+			if p == false then return
+			v.delete
+		end if
+		
+		globals.comp.touch(globals.path,"router_versions.txt")
+		v = globals.comp.File(globals.path+"/router_versions.txt")
+		v.set_content(str(versionMap))
+	
+		Print("Saved as "+globals.path+"/router_versions.txt")
+	
+		return versionMap
+	end function
+	
+	return getVersions(scans)
+end function
 
-	globals.H = []
+Commands["cve"] = {"Name":"cve","Description":"Get banks from the ip you got from the cve-xp tool.","Args":"[ip/domain]","Shell":false}
+Commands["cve"]["Run"] = function(args,pipe)
+	ipAddr = null
+	ip = args[0]
 
 	if not is_valid_ip(ip) then
 		if is_valid_ip(nslookup(ip)) then
@@ -1381,7 +1491,103 @@ Commands["manual"]["Run"] = function(args,pipe)
 	end if
 	ipAddr = ip
 
+	if is_lan_ip(ipAddr) then
+		return error("CVE-XP only shows remote ips!")
+	else
+		router = getRouter(ipAddr)
+		metaLibs = extractMetaLibs(router)
+	end if
+
+	computerIps = getComputers(ipAddr)
+	if computerIps.len == 0 then return error("No computers found on network!")
+
+	foundExploits = []
+	bestExploit = null
+	bestExploitUser = "_"
+	exploitMetaLib = null
+
+	for metaLib in metaLibs
+		if metaLib.metaLib.lib_name != "kernel_router.so" then continue
+
+		if loadExploits(metaLib.metaLib).len == 0 then
+			scanTarget(metaLib.metaLib)
+		end if
+
+		exploits = loadExploits(metaLib.metaLib)
 		
+		for exploit in exploits
+			exploitObj = runExploit(exploit, metaLib.metaLib, computerIps[0], "nopopups")
+			if typeof(exploitObj) != "computer" then continue
+			
+			foundExploits.push(exploit)
+
+			user = getUser(exploitObj)
+			if user == "guest" then
+				if bestExploitUser != "_" then continue
+				bestExploit = exploit
+				exploitMetaLib = metaLib
+				bestExploitUser = "guest"
+				continue
+			end if
+
+			if user == "root" then
+				bestExploit = exploit
+				exploitMetaLib = metaLib
+				bestExploitUser = user
+				continue
+			end if
+
+			if user != "guest" then
+				if bestExploitUser == "root" then continue
+				bestExploit = exploit
+				exploitMetaLib = metaLib
+				bestExploitUser = user
+				continue
+			end if
+		end for
+	end for
+
+	if foundExploits.len == 0 then return error("Exploit failed!")
+
+	banks = []
+
+	for localIp in computerIps
+		exploitObj = runExploit(bestExploit, exploitMetaLib.metaLib, localIp, "nopopups")
+		if typeof(exploitObj) != "computer" then continue
+
+		files = FindFile("Bank.txt",exploitObj)
+		files = rm_dupe(files)
+		files.sort
+		for file in files
+			file = exploitObj.File(file)
+			if file.has_permission("r") then
+				banks.push(file.get_content)
+			end if
+		end for
+	end for
+
+	banks.sort
+
+	Print("<b>Banks:</b>\n"+banks.join("\n"))
+	return banks
+end function
+
+Commands["manual"] = {"Name": "manual","Description": "Manual scanning.","Args": "[ip/domain]","Shell":false}
+Commands["manual"]["Run"] = function(args,pipe)
+	ip = args[0]
+	port = null
+	ipAddr = null
+	localIp = null
+
+	if not is_valid_ip(ip) then
+		if is_valid_ip(nslookup(ip)) then
+			ip = nslookup(ip)
+		else
+			return error("IP not found!")
+		end if
+	end if
+	ipAddr = ip
+
 	while 1
 		if is_lan_ip(ipAddr) then
 			displayLocalMap(ipAddr)
@@ -1406,7 +1612,7 @@ Commands["manual"]["Run"] = function(args,pipe)
 			
 			break
 		end while
-
+		if not metaLib then break
 		while 1
 			choices = ["\n\n<b>Choose which exploit you would like to use:</b>"]
 			exploits = loadExploits(metaLib.metaLib)
@@ -1720,74 +1926,6 @@ Commands["nc"]["Run"] = function(params,pipe)
 	end if
 	
 	return error("unknown command")
-end function
-
-Commands["sys"] = {"Name": "sys","Description": "System shell.","Args": "","Shell":false}
-Commands["sys"]["Run"] = function(params,pipe)
-
-	system_shell = function()
-		
-		
-		message = user_input("\n"+t.bd+"NamelessOS [SYSTEM]"+C.e+t.p+" $ "+t.i)
-		args = message.split(" ")
-		
-		if args[0] == "commands" or args[0] == "help"  then
-			Print("\n"+L.c+t.t+"System Commands:"+C.e+"\n")
-			
-			Print(L.bc+"secure -> Removes programs/files that introduce security issues also chmods the system.")
-			Print(L.bc+"decipher [file] -> Decipher tool.\n")
-			Print(L.bc+"exit -> Exits the shell.\n")
-			Print(L.bc+"help/commands -> Lists all commands.\n")
-			
-			Print(L.bc+"<i>More soon..</i>\n")
-			
-			
-		end if
-		
-		
-		if args[0] == "decipher" then
-			crypto = loadLibrary("crypto.so",true)
-			if not crypto then return error("Can't find crypto library")
-			
-			filename = args[1]
-			file = globals.comp.File(filename)
-			if not file == null then
-				
-				logins = file.get_content.split(char(10))
-				for login in logins
-					info = login.split(":")
-					accnum = info[0]
-					hash = info[1]
-					got = crypto.decipher(hash)
-					Print(accnum+" -> "+got)
-				end for
-				
-			end if
-			
-		end if
-		
-		if args[0] == "secure" then
-			
-			if not globals.usr == "root" then
-				Print(t.e+"NamelessOS cannot be sure that this command worked due to no root access"+C.e)	
-			end if
-			
-			securesys(globals.comp)
-
-			Print(t.s+"NamelessOS has secured this machine.")
-			Print(t.e+"You have too run sudo an get root before you can do anything or your machine"+C.e)
-		end if
-		
-		
-		if args[0] == "exit" then
-			return
-		end if
-		
-		
-		system_shell
-	end function
-
-	return system_shell
 end function
 
 parseCmd = function(input)
