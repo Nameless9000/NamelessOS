@@ -1,10 +1,41 @@
-authentication = function()
-	clear_screen
+date_expired = function(date1)
+	date1 = date1.split("-")
+	d11 = date1[0].to_int
+	d12 = date1[1].to_int
+	d13 = date1[2].to_int
+	date1[0] = d11+1
+
+	date = current_date.split(" ")
+	date = date[0].split("-")
+
+	d21 = date[0].to_int
+	d22 = date[1].to_int
+	d23 = date[2].to_int
+
+	if d23 > d13 then return 1
+	if d22 > d12 then return 1
+	if d21 > d11 then return 1
+
+	return 0
+end function
+
+get_next_date = function()
+	date1 = current_date.split(" ")[0].split("-")
+	d11 = date1[0].to_int
+	d12 = date1[1].to_int
+	d13 = date1[2].to_int
+	date1[0] = d11+1
+	return date1.join("-")
+end function
+
+gen2FA = function()
 	x1=str(floor((rnd * 10)))
 	x2=str(floor((rnd * 10)))
 	x3=str(floor((rnd * 10)))
 	x4=str(floor((rnd * 10)))
-	OTP = x1+x2+x3+x4
+	x5=str(floor((rnd * 10)))
+	x6=str(floor((rnd * 10)))
+	OTP = x1+x2+x3+x4+x5+x6
 
 	passwd = "Password: "+char(10)+"Not found"
 
@@ -37,10 +68,56 @@ authentication = function()
 	mail = mail_login(globals.email.user,globals.email.password)
 	mail.send(globals.email.user, OTP, message)
 
-	Print("\n"+t.o+"[NamelessOS Authentication "+namelessos_version+"]"+C.e)
-	inputOPT = user_input(t.o+"Enter OTP: "+C.e)
+	return OTP
+end function
 
-	if inputOPT == OTP then return
+authentication = function()
+	clear_screen
+
+	Print("\n"+t.o+"[NamelessOS Authentication "+namelessos_version+"]"+C.e)
+	inputPass = user_input(t.o+"Enter Login Code: "+C.e)
+
+	if inputPass != globals.auth.pass then exit("Access Denied!")
+
+	globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
+	globals.db_pc = globals.db_shell.host_computer
+	globals.db_ip = globals.config.db
+
+	if not db_shell then
+		error("CRITICAL ERROR DATABASE NOT FOUND!")
+		exit("Process terminated")
+	end if
+
+	if globals.comp.public_ip == globals.auth.mfaIp and user_mail_address == globals.auth.emailCheck then
+		if globals.db_pc.File("/2FA.cfg") then
+			x2fa = globals.db_pc.File("/2FA.cfg").get_content
+			x2fa = x2fa.split(";")
+
+			if date_expired(x2fa[1]) then
+				code = gen2FA
+				nd = get_next_date
+
+				globals.db_pc.File("/2FA.cfg").set_content(code+";"+nd)
+			end if
+		else
+			globals.db_pc.touch("/","2FA.cfg")
+
+			code = gen2FA
+			nd = get_next_date
+
+			globals.db_pc.File("/2FA.cfg").set_content(code+";"+nd)
+		end if
+	end if
+	
+	inputOPT = user_input(t.o+"Enter 2FA Code: "+C.e)
+	if globals.db_pc.File("/2FA.cfg") then
+		x2fa = globals.db_pc.File("/2FA.cfg").get_content
+		x2fa = x2fa.split(";")
+
+		if str(x2fa[0]) == str(inputOPT) then return
+	else
+		exit("Access Denied!")
+	end if
 
 	exit("Access Denied!")
 end function
@@ -49,14 +126,6 @@ authentication
 
 Print(t.o+"NamelessOS Loaded!\n\n"+C.e)
 
-globals.ppath = pparse(path)
-globals.db_shell = get_shell.connect_service(globals.config.db,22,"root",globals.config.db_pass)
-
-if not db_shell then
-	error("CRITICAL ERROR DATABASE NOT FOUND!")
-	exit("Process terminated")
-end if
-
 clear_screen
 if globals.config.deleteLogs == true then
 	log = hs.host_computer.File("/var/system.log")
@@ -64,8 +133,7 @@ if globals.config.deleteLogs == true then
 		log.delete
 	end if
 end if
-globals.db_pc = globals.db_shell.host_computer
-globals.db_ip = globals.config.db
+globals.ppath = pparse(path)
 
 securesys(db_pc)
 
@@ -1514,11 +1582,17 @@ Commands["cve"]["Run"] = function(args,pipe)
 		
 		for exploit in exploits
 			exploitObj = runExploit(exploit, metaLib.metaLib, computerIps[0], "nopopups")
+			info(exploitObj)
 			if typeof(exploitObj) != "computer" then continue
-			
-			foundExploits.push(exploit)
 
 			user = getUser(exploitObj)
+
+			if bestExploit == null then
+				bestExploit = exploit
+				bestExploitUser = user
+				exploitMetaLib = metaLib
+			end if
+			
 			if user == "guest" then
 				if bestExploitUser != "_" then continue
 				bestExploit = exploit
@@ -1531,20 +1605,16 @@ Commands["cve"]["Run"] = function(args,pipe)
 				bestExploit = exploit
 				exploitMetaLib = metaLib
 				bestExploitUser = user
-				continue
 			end if
 
-			if user != "guest" then
-				if bestExploitUser == "root" then continue
-				bestExploit = exploit
-				exploitMetaLib = metaLib
-				bestExploitUser = user
-				continue
-			end if
+			if bestExploitUser == "root" then continue
+			bestExploit = exploit
+			exploitMetaLib = metaLib
+			bestExploitUser = user
 		end for
 	end for
 
-	if foundExploits.len == 0 then return error("Exploit failed!")
+	if bestExploit == null then return error("Exploit failed!")
 
 	banks = []
 
@@ -1564,6 +1634,8 @@ Commands["cve"]["Run"] = function(args,pipe)
 	end for
 
 	banks.sort
+
+	print("got "+banks.len+" banks. (~$"+(1250*banks.len)+")")
 
 	Print("<b>Banks:</b>\n"+banks.join("\n"))
 	return banks
