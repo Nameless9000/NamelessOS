@@ -1443,9 +1443,6 @@ Commands["cve-xp"]["Run"] = function(args,pipe)
 			version = router.kernel_version
 	
 			if cve.hasIndex(version) then
-				if versions.indexOf(version) > 0 then continue
-				versions.push(version)
-				versionMap[version] = ipAddress
 				Print("<color=#f1af45>["+cve[version]+" CVE DETECTED]: "+ipAddress+"</color>")
 			else
 				if printRandom and not checked.hasIndex(version) then
