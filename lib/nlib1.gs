@@ -323,7 +323,6 @@ padSpacesRight = function(s, l, p = " ")
 	return (padString+s)
 end function
 
-
 getRouter = function(IPAddress)	
 	router = get_router(IPAddress)
 	if not router then
@@ -698,7 +697,9 @@ changeExploitType = function(exploitToChange, target, newType)
 	return newExploit
 end function
 
-runExploit = function(exploit, target, lip)
+runExploit = function(exploit, target, lip, opt)
+	if not opt then opt = "none"
+
 	while 1
 		info("\n<b>Applying exploit <i>"+exploit.type+"</i> against target: <i>"+target.lib_name+"</i></b>")
 		
@@ -738,6 +739,7 @@ runExploit = function(exploit, target, lip)
 		
 		info("Result is an object of type <i>"+typeof(overflowResult)+"</i>")
 		if typeof(overflowResult) == "null" or str(overflowResult) == "0" then
+			if opt == "nopopups" then return null
 			choices = [""]
 			choices.push("Requirements not met.")
 			choices.push("Invalid type.")
@@ -1249,7 +1251,6 @@ browseFiles = function(dirPtr, hostInfo = "")
 	end while
 end function
 
-
 chooseMetaLib = function(metaLibs)
 	while 1
 		print("\n<b>Found the following entry point(s): </b>")
@@ -1295,4 +1296,29 @@ chooseMetaLib = function(metaLibs)
 		end if
 		return metaLibs[i-1]
 	end while
+end function
+
+getComputers = function(ip)
+	computers = []
+
+	mRouter = getRouter(ip)
+	for externalPort in mRouter.used_ports
+		computers.push(externalPort.get_lan_ip)
+	end for
+
+	if not mRouter.devices_lan_ip then return rm_dupe(computers)
+
+	for localMachine in mRouter.devices_lan_ip
+		llen = localMachine.len
+		if localMachine[-1] == "1" and localMachine[-2] == "." then
+			startLan = slice(localMachine,0,llen-1)
+			for i in range(2,20)
+				computers.push(startLan+str(i))
+			end for
+		else
+			computers.push(localMachine)
+		end if
+	end for
+
+	return rm_dupe(computers)
 end function
