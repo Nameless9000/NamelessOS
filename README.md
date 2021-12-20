@@ -29,6 +29,7 @@ Local hacking: 'getsystem'
 globals.ipProtect="ip";
 globals.server={"db":"1.1.1.1","pass":"1234"};
 globals.email={"user":"x@x.com","password":"1234"};
+globals.auth={"pass":"password123","mfaIp"":"123.123.123.123","emailCheck":"x@x.com"};
 import_code("/lib/ninit");
 import_code("/lib/nlib1");
 import_code("/lib/nmain");
