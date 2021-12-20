@@ -1440,10 +1440,10 @@ Commands["overflow"]["Run"] = function(args,pipe)
 	return error("Exploit failed.")
 end function
 
+cve = {"1.0.0":"NORMAL","1.0.1":"NORMAL","1.0.2":"MINOR","1.0.4":"MINOR","1.0.5":"NORMAL","1.0.6":"NORMAL","1.0.7":"NORMAL","1.1.3":"MINOR","1.1.4":"MINOR","1.1.5":"MINOR","1.1.6":"MINOR","1.2.0":"MINOR","1.2.1":"MINOR","1.2.5":"NORMAL","1.2.6":"NORMAL","1.2.7":"NORMAL","1.2.8":"NORMAL","1.3.2":"MINOR","1.3.3":"MINOR","1.3.4":"MINOR","1.3.5":"MINOR","1.3.6":"MINOR","1.3.7":"MINOR","1.3.8":"NORMAL","1.3.9":"MINOR","1.4.3":"MINOR"}
+
 Commands["cve-xp"] = {"Name":"cve-xp","Description":"Scan random ips for common vulnerabilites.","Args":"","Shell":false}
 Commands["cve-xp"]["Run"] = function(args,pipe)
-	cve = {"1.0.0":"NORMAL","1.0.1":"NORMAL","1.0.2":"MINOR","1.0.4":"MINOR","1.0.5":"NORMAL","1.0.6":"NORMAL","1.0.7":"NORMAL","1.0.8":"MINOR","1.1.1":"MINOR","1.1.3":"MINOR","1.1.4":"MINOR","1.1.5":"NORMAL","1.1.6":"NORMAL","1.2.0":"MINOR","1.2.1":"MINOR","1.2.5":"NORMAL","1.2.6":"NORMAL","1.2.7":"NORMAL","1.2.8":"NORMAL","1.3.2":"MINOR","1.3.3":"MINOR","1.3.4":"MINOR","1.3.5":"MINOR","1.3.6":"MINOR","1.3.7":"MINOR","1.3.8":"NORMAL","1.3.9":"MINOR"}
-	
 	random = function(min, max)
 		min = ceil(min);
 		max = floor(max);
@@ -1479,11 +1479,6 @@ Commands["cve-xp"]["Run"] = function(args,pipe)
 	
 	title
 	
-	metaxploit = loadLibrary("metaxploit.so")
-	if not metaxploit then
-		error("Metaxploit Library not found.")
-		return
-	end if
 	
 	scans = user_input("How many ips to you want to scan: ")
 	if (not scans.to_int) or (scans.to_int < 0) then
@@ -1542,6 +1537,88 @@ Commands["cve-xp"]["Run"] = function(args,pipe)
 	return getVersions(scans)
 end function
 
+Commands["bankfarm"] = {"Name":"bankfarm","Description":"cve-xp + cve in 1.","Args":"","Shell":false}
+Commands["bankfarm"]["Run"] = function(args,pipe)
+	random = function(min, max)
+		min = ceil(min);
+		max = floor(max);
+		return floor(rnd * (max - min + 1)) + min;
+	end function
+	
+	randomIp = function() 
+		return str(random(1,223))+"."+str(random(0,255))+"."+str(random(0,255))+"."+str(random(0,255))
+	end function
+
+	banks = []
+
+	times = user_input("How many servers do you want to hack: ").to_int
+
+	for _ in range(1,times)
+		ipAddr = null
+
+		while ipAddr == null
+			ipAddress = randomIp
+			router = getRouter(ipAddress)
+			if not router then continue
+			version = router.kernel_version
+			if cve.hasIndex(version) then ipAddr = ipAddress
+		end while
+
+		router = getRouter(ipAddr)
+		metaLibs = extractMetaLibs(router)
+
+		computerIps = getComputers(ipAddr)
+		if computerIps.len == 0 then continue
+
+		exploitO = null
+		metaLibO = null
+
+		for metaLib in metaLibs
+			if metaLib.metaLib.lib_name != "kernel_router.so" then continue
+
+			if loadExploits(metaLib.metaLib).len == 0 then
+				scanTarget(metaLib.metaLib)
+			end if
+
+			exploits = loadExploits(metaLib.metaLib)
+			
+			for exploit in exploits
+				exploitObj = runExploit(exploit, metaLib.metaLib, computerIps[0], "nopopups")
+				if typeof(exploitObj) != "computer" then continue
+
+				exploitO = exploit
+				metaLibO = metaLib
+
+				if exploitObj.local_ip == computerIps[0] then break
+			end for
+		end for
+
+		if exploitO == null then continue
+
+		for localIp in computerIps
+			exploitObj = runExploit(exploitO, metaLibO.metaLib, localIp, "nopopups")
+			if exploitObj == null then continue
+
+			files = FindFile("Bank.txt",exploitObj)
+			files = rm_dupe(files)
+			files.sort
+			for file in files
+				file = exploitObj.File(file)
+				if file.has_permission("r") then
+					banks.push(file.get_content)
+				end if
+			end for
+		end for
+	end for
+
+	banks.sort
+
+	print("got "+banks.len+" banks. (~$"+(1250*banks.len)+")")
+
+	Print("<b>Banks:</b>\n"+banks.join("\n"))
+	return banks
+end function
+
 Commands["cve"] = {"Name":"cve","Description":"Get banks from the ip you got from the cve-xp tool.","Args":"[ip/domain]","Shell":false}
 Commands["cve"]["Run"] = function(args,pipe)
 	ipAddr = null
@@ -1567,9 +1644,8 @@ Commands["cve"]["Run"] = function(args,pipe)
 	if computerIps.len == 0 then return error("No computers found on network!")
 
 	foundExploits = []
-	bestExploit = null
-	bestExploitUser = "_"
-	exploitMetaLib = null
+	exploitO = null
+	metaLibO = null
 
 	for metaLib in metaLibs
 		if metaLib.metaLib.lib_name != "kernel_router.so" then continue
@@ -1582,45 +1658,22 @@ Commands["cve"]["Run"] = function(args,pipe)
 		
 		for exploit in exploits
 			exploitObj = runExploit(exploit, metaLib.metaLib, computerIps[0], "nopopups")
-			info(exploitObj)
 			if typeof(exploitObj) != "computer" then continue
 
-			user = getUser(exploitObj)
+			exploitO = exploit
+			metaLibO = metaLib
 
-			if bestExploit == null then
-				bestExploit = exploit
-				bestExploitUser = user
-				exploitMetaLib = metaLib
-			end if
-			
-			if user == "guest" then
-				if bestExploitUser != "_" then continue
-				bestExploit = exploit
-				exploitMetaLib = metaLib
-				bestExploitUser = "guest"
-				continue
-			end if
-
-			if user == "root" then
-				bestExploit = exploit
-				exploitMetaLib = metaLib
-				bestExploitUser = user
-			end if
-
-			if bestExploitUser == "root" then continue
-			bestExploit = exploit
-			exploitMetaLib = metaLib
-			bestExploitUser = user
+			if exploitObj.local_ip == computerIps[0] then break
 		end for
 	end for
 
-	if bestExploit == null then return error("Exploit failed!")
+	if exploitO == null then return error("Exploit failed!")
 
 	banks = []
 
 	for localIp in computerIps
-		exploitObj = runExploit(bestExploit, exploitMetaLib.metaLib, localIp, "nopopups")
-		if typeof(exploitObj) != "computer" then continue
+		exploitObj = runExploit(exploitO, metaLibO.metaLib, localIp, "nopopups")
+		if exploitObj == null then continue
 
 		files = FindFile("Bank.txt",exploitObj)
 		files = rm_dupe(files)
