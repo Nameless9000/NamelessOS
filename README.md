@@ -11,7 +11,7 @@ My hacking tool.
 
 # How to use
 
-1. you will receive an email with a code, enter that code into the input
+1. you will receive an email with a code, enter that code into the input (ONLY IF U RUN NAMELESS OS ON THE IP YOU SET AS MFA IP)
 2. type 'help' for all commands
 3. run 'secure' to secure your pc (you will need to manually secure your network)
 4. you can run commands one after the other eg. 'nmap 1.1.1.1;nc -lvnp 1337'
