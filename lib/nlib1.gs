@@ -16,6 +16,53 @@ SearchFolder = function(folder, name = "", special = false, output)
 	end for
 end function
 
+SearchFolder2 = function(folder, name = "", special = false, output)
+	if not folder then return "ERROR_FOLDER_IN_NULL"
+
+	if special then
+		for file in folder.get_files
+			if file.name.indexOf(name) != null then output.push(file)
+		end for
+	else
+		for file in folder.get_files
+			if file.name == name then return output.push(file)
+		end for
+	end if
+	
+	for folder in folder.get_folders
+		SearchFolder2(folder, name, special, output)
+	end for
+end function
+
+FindFile2 = function(name = "",pc=null)
+	if pc == null then pc = globals.shell
+	root_folder = null
+	if typeof(pc) == "shell" then root_folder = pc.host_computer.File("/")
+	if typeof(pc) == "computer" then root_folder = pc.File("/")
+	if typeof(pc) == "file" then root_folder = NavToRoot(pc)
+	
+	if root_folder == null then return "ERROR_ROOT_FOLDER_NOT_OBTAINED"
+	output = []
+	special = false
+	if name.indexOf("*") != null then
+		special = true
+		name = name.remove("*")
+	end if
+
+	if special then
+		for file in root_folder.get_files
+			if file.name.indexOf(name) != null then output.push(file)
+		end for
+	else
+		for file in root_folder.get_files
+			if file.name == name then return output.push(file)
+		end for
+	end if
+
+	SearchFolder2(root_folder, name, special, output)
+	return rm_dupe(output)
+end function
+
 SearchFFolder = function(folder, name = "", special = false, output)
 	if not folder then return "ERROR_FOLDER_IN_NULL"
 	if special then
@@ -769,7 +816,7 @@ runExploit = function(exploit, target, lip, opt)
 		else if typeof(overflowResult) == "shell" or typeof(overflowResult) == "computer" or typeof(overflowResult) == "file" or typeof(overflowResult) == "number" then
 			if not exploit.type.lower == typeof(overflowResult) then
 				changeExploitType(exploit, target, typeof(overflowResult).upper[0]+typeof(overflowResult)[1:])
-				return null
+				return overflowResult
 			end if
 			return overflowResult
 		else
