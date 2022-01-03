@@ -715,6 +715,7 @@ scanTarget = function(target)
 	info("library updated.")
 end function
 
+
 changeExploitType = function(exploitToChange, target, newType)
 	info("Updating exploit type from "+exploitToChange.type+" to "+newType)
 	newExploit = exploitToChange
