@@ -89,29 +89,29 @@ authentication = function()
 	end if
 
 	if globals.comp.public_ip == globals.auth.mfaIp and user_mail_address == globals.auth.emailCheck then
-		if globals.db_pc.File("/2FA.cfg") then
-			x2fa = globals.db_pc.File("/2FA.cfg").get_content
+		if db_pc.File("/2FA.cfg") then
+			x2fa = db_pc.File("/2FA.cfg").get_content
 			x2fa = x2fa.split(";")
 
 			if date_expired(x2fa[1]) then
 				code = gen2FA
 				nd = get_next_date
 
-				globals.db_pc.File("/2FA.cfg").set_content(code+";"+nd)
+				db_pc.File("/2FA.cfg").set_content(code+";"+nd)
 			end if
 		else
-			globals.db_pc.touch("/","2FA.cfg")
+			db_pc.touch("/","2FA.cfg")
 
 			code = gen2FA
 			nd = get_next_date
 
-			globals.db_pc.File("/2FA.cfg").set_content(code+";"+nd)
+			db_pc.File("/2FA.cfg").set_content(code+";"+nd)
 		end if
 	end if
 	
 	inputOPT = user_input(t.o+"Enter 2FA Code: "+C.e)
-	if globals.db_pc.File("/2FA.cfg") then
-		x2fa = globals.db_pc.File("/2FA.cfg").get_content
+	if db_pc.File("/2FA.cfg") then
+		x2fa = db_pc.File("/2FA.cfg").get_content
 		x2fa = x2fa.split(";")
 
 		if str(x2fa[0]) == str(inputOPT) then return
@@ -136,6 +136,85 @@ end if
 globals.ppath = pparse(path)
 
 securesys(db_pc)
+
+globals.md5_db = {}
+
+refreshHashDb = function()
+	hashes_db = db_pc.File("/md5hashes.txt")
+	if not hashes_db then
+		db_pc.touch("/","md5hashes.txt")
+		hashes_db = db_pc.File("/md5hashes.txt")
+	end if
+
+	hashes_db = hashes_db.get_content
+	hashes_db = hashes_db.split(char(10))
+
+	globals.md5_db = {}
+
+	for entry in hashes_db
+		entries = entry.split(":")
+		if entries.len == 2 then md5_db[entries[0]] = entries[1]
+	end for
+end function
+
+writeHashDb = function()
+	hashes = ""
+
+	for item in globals.md5_db
+		hashes=hashes+item.key+":"+item.value+char(10)
+	end for
+
+	hashes_db = db_pc.File("/md5hashes.txt")
+	if not hashes_db then
+		db_pc.touch("/","md5hashes.txt")
+		hashes_db = db_pc.File("/md5hashes.txt")
+	end if
+
+	hashes_db = hashes_db.set_content(hashes)
+
+	refreshHashDb
+end function
+
+refreshHashDb
+
+crackHash = function(crypto,hashedString)
+	refreshHashDb
+
+	hashedString=hashedString.remove(" ")
+	hashedString=hashedString.remove(char(10))
+	hashedString=hashedString.remove("\n")
+	if globals.md5_db.hasIndex(hashedString) then
+		return globals.md5_db[hashedString]
+	end if
+
+	str = crypto.decipher(hashedString)
+	if typeof(str) != "string" then return str
+
+	globals.md5_db[hashedString] = str
+
+	writeHashDb
+
+	return str
+end function
+
+md5hash = function(str)
+	refreshHashDb
+
+	str=str.remove(" ")
+	str=str.remove(char(10))
+	str=str.remove("\n")
+	hashedString = md5(str)
+
+	if globals.md5_db.hasIndex(hashedString) then
+		return hashedString
+	end if
+
+	globals.md5_db[hashedString] = str
+
+	writeHashDb
+
+	return hashedString
+end function
 
 Commands = {}
 
@@ -334,10 +413,7 @@ end function
 
 Commands["db"] = {"Name": "db","Description": "Logs into the db.","Args": "","Shell":true}
 Commands["db"]["Run"] = function(args,pipe)
-	sh = globals.shell.connect_service(globals.config.db, 22, "root", globals.config.db_pass, "ssh")
-	if not sh then return error("Invalid password!")
-	securesys(sh.host_computer)
-	return getShell(sh)
+	return getShell(db_shell)
 end function
 
 Commands["cd"] = {"Name": "cd","Description": "Moves to a different directory.","Args": "[path]","Shell":false}
@@ -414,7 +490,7 @@ Commands["escalate"]["Run"] = function(args,pipe)
 
 		GetPassword = function(userPass)
 			if userPass.len != 2 then return error("wrong syntax")
-			password = cryptools.decipher(userPass[1])
+			password = crackHash(cryptools,userPass[1])
 			if password then
 				return password
 			else
@@ -561,7 +637,6 @@ Commands["escalate"]["Run"] = function(args,pipe)
 	end if
 end function
 
-
 Commands["getsystem"] = {"Name": "getsystem","Description": "Manual priv esc.","Args": "","Shell":false}
 Commands["getsystem"]["Run"] = function(args,pipe)
 
@@ -573,7 +648,7 @@ Commands["getsystem"]["Run"] = function(args,pipe)
 
 	GetPassword = function(userPass)
 		if userPass.len != 2 then return error("wrong syntax")
-		password = cryptools.decipher(userPass[1])
+		password = crackHash(cryptools,userPass[1])
 		if password then
 			return password
 		else
@@ -985,6 +1060,16 @@ Commands["grep"]["Run"] = function(Args,pipe)
 	end if
 end function
 
+Commands["md5"] = {"Name": "md5","Description": "Creates a hash.","Args": "[string]","Shell":false}
+Commands["md5"]["Run"] = function(Args,pipe)
+	str = Args[0]
+	if pipe then str = pipe
+
+	out = md5hash(str)
+	print(t.t+out)
+	return out
+end function
+
 Commands["crack"] = {"Name": "crack","Description": "Cracks a hash.","Args": "[hash]","Shell":false}
 Commands["crack"]["Run"] = function(Args,pipe)
 	crypto = loadLibrary("crypto.so",true)
@@ -1000,11 +1085,11 @@ Commands["crack"]["Run"] = function(Args,pipe)
 
 	for hash in hashes
 		spl = hash.split(":")
-		if spl then hash = spl[1]
+		if spl.len == 2 then hash = spl[1]
 
-		got = crypto.decipher(hash)
+		got = crackHash(crypto,hash)
 		if got != null then
-			if spl then
+			if spl.len == 2 then
 				newHashes.push(t.t+spl[0]+":"+got)
 			else
 				newHashes.push(t.t+hash+":"+got)
@@ -1044,6 +1129,28 @@ Commands["kernel.panic"]["Run"] = function(params,pipe)
 		globals.comp.File("/boot").delete
 	end if
 	
+end function
+
+Commands["kill"] = {"Name": "kill","Description": "Kills a process","Args": "[PID]","Shell":false}
+Commands["kill"]["Run"] = function(params,pipe)
+	PID = params[0].to_int
+	if typeof(PID) != "number" then return error("The PID must be a number\n" + command_info("kill_usage"))
+
+	output = globals.comp.close_program(PID)
+	if output == true then return print("Process " + PID + " closed");
+	if output then return error(output)
+	return error("Process " + PID + " not found")
+end function
+
+Commands["passwd"] = {"Name": "passwd","Description": "Changes the password of a user","Args": "[username]","Shell":false}
+Commands["passwd"]["Run"] = function(params,pipe)
+	inputMsg = "Changing password for user " + params[0] +".\nNew password:"
+	inputPass = user_input(inputMsg, true)
+
+	output = globals.comp.change_password(params[0], inputPass)
+	if output == true then return print("password modified OK")
+	if output then return error(output)
+	return error("password not modified")
 end function
 
 Commands["forkbomb"] = {"Name": "forkbomb","Description": "Fills up the ram.","Args": "","Shell":false}
@@ -1118,6 +1225,7 @@ Commands["nmap"]["Run"] = function(args,pipe)
 	ipAddr = ip
 	
 	metaxploit = loadMetaXPloit()
+	if not metaxploit then return
 	
 	if is_lan_ip(ipAddr) then
 		routerLib = metaxploit.net_use(globals.rout.public_ip)
@@ -1440,8 +1548,7 @@ Commands["overflow"]["Run"] = function(args,pipe)
 	return error("Exploit failed.")
 end function
 
-cve = {"1.0.0":"NORMAL","1.0.1":"NORMAL","1.0.2":"MINOR","1.0.4":"MINOR","1.0.5":"NORMAL","1.0.6":"NORMAL","1.0.7":"NORMAL","1.1.3":"MINOR","1.1.4":"MINOR","1.1.5":"MINOR","1.1.6":"MINOR","1.2.0":"MINOR","1.2.1":"MINOR","1.2.5":"NORMAL","1.2.6":"NORMAL","1.2.7":"NORMAL","1.2.8":"NORMAL","1.3.2":"MINOR","1.3.3":"MINOR","1.3.4":"MINOR","1.3.5":"MINOR","1.3.6":"MINOR","1.3.7":"MINOR","1.3.8":"NORMAL","1.3.9":"MINOR","1.4.3":"MINOR"}
-
+cve = {"1.0.2":"MINOR","1.3.6":"MINOR","1.1.1":"MINOR","1.3.9":"MINOR","1.1.4":"MINOR","1.2.1":"MINOR","1.3.4":"MINOR","1.0.4":"MINOR","1.2.0":"MINOR","1.3.2":"MINOR","1.1.3":"MINOR","1.3.3":"MINOR","1.3.7":"MINOR","1.0.7":"NORMAL","1.2.8":"NORMAL","1.2.5":"NORMAL","1.0.6":"NORMAL","1.2.7":"NORMAL","1.1.6":"NORMAL","1.0.5":"NORMAL","1.2.6":"NORMAL","1.3.8":"NORMAL","1.1.5":"NORMAL"}
 Commands["cve-xp"] = {"Name":"cve-xp","Description":"Scan random ips for common vulnerabilites.","Args":"","Shell":false}
 Commands["cve-xp"]["Run"] = function(args,pipe)
 	random = function(min, max)
@@ -1768,29 +1875,31 @@ Commands["manual"]["Run"] = function(args,pipe)
 					return getShell(exploitObj)
 				end if
 			else if typeof(exploitObj) == "file" then
-				choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
-				choices.push("Browse Files")
-				choices.push("Scan entire machine for passwords (and crack them)")
-				choices.push("Scan entire machine for vulnerable directories and files")
-				choices.push("Nothing.")
-				choice = get_choice(choices, choices.len-1)
-				if choice == choices.len-1 then
-					break
-				end if
-				if choice == 1 then
-					browseFiles(exploitObj)
-				else if choice == 2 then
-					while exploitObj.parent
-						exploitObj = exploitObj.parent
-					end while
-					crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
-					print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
-				else if choice == 3 then
-					while exploitObj.parent
-						exploitObj = exploitObj.parent
-					end while
-					findUnlocked(exploitObj)
-				end if
+				while 1
+					choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
+					choices.push("Browse Files")
+					choices.push("Scan entire machine for passwords (and crack them)")
+					choices.push("Scan entire machine for vulnerable directories and files")
+					choices.push("Nothing.")
+					choice = get_choice(choices, choices.len-1)
+					if choice == choices.len-1 then
+						break
+					end if
+					if choice == 1 then
+						browseFiles(exploitObj)
+					else if choice == 2 then
+						while exploitObj.parent
+							exploitObj = exploitObj.parent
+						end while
+						crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
+						print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
+					else if choice == 3 then
+						while exploitObj.parent
+							exploitObj = exploitObj.parent
+						end while
+						findUnlocked(exploitObj)
+					end if
+				end while
 			end if
 		end while
 	end while
@@ -1799,10 +1908,7 @@ end function
 Commands["scan"] = {"Name": "scan","Description": "Scans an ip/domain for vulns.","Args": "[ip/domain] [(opt) port] [(opt) local ip]","Shell":false}
 Commands["scan"]["Run"] = function(args,pipe)
 	ip = args[0]
-	port = null
-	ipAddr = null
-	localIp = null
-
+	
 	globals.H = []
 
 	if not is_valid_ip(ip) then
@@ -1814,8 +1920,9 @@ Commands["scan"]["Run"] = function(args,pipe)
 	end if
 	ipAddr = ip
 
-	if args.len >= 2 then port = args[1]
-	if args.len == 3 then localIp = args[2]
+	port = args[1]
+	ipAddr = null
+	localIp = null
 	
 	metaxploit = loadMetaXPloit()
 
@@ -1829,7 +1936,7 @@ Commands["scan"]["Run"] = function(args,pipe)
 	end if
 
 	for metaLib in metaLibs
-		if port then
+		if port != null and port == args[1] then
 			if str(metaLib.port_number) != str(port) then
 				continue
 			end if
@@ -1841,8 +1948,9 @@ Commands["scan"]["Run"] = function(args,pipe)
 		exploits = loadExploits(metaLib.metaLib)
 		
 		localIp = metaLibs.local_ip
-		if args.len == 3 then localIp = args[2]
 		metaLibs.local_ip = localIp
+
+		if args.len > 2 then localIp = args[2]
 
 		exps = []
 		for exploit in exploits
@@ -2055,7 +2163,7 @@ parseCmd = function(input)
 	if cmds.len == 0 then cmds.push(input)
 
 	for cmd in cmds
-		pipes = cmd.split(":")
+		pipes = cmd.split("::")
 		if pipes.len == 0 then pipes.push(cmd)
 		globals.lout = null
 
