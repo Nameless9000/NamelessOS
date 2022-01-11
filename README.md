@@ -1,6 +1,8 @@
 # NamelessOS
 My hacking tool.
 
+[Wiki Link](https://github.com/Nameless9000/NamelessOS/wiki)
+
 # How to install:
 
 1. save or compile all files in [/lib](https://github.com/Nameless9000/NamelessOS/tree/main/lib) with allow import on
