@@ -33,9 +33,7 @@ gen2FA = function()
 	x2=str(floor((rnd * 10)))
 	x3=str(floor((rnd * 10)))
 	x4=str(floor((rnd * 10)))
-	x5=str(floor((rnd * 10)))
-	x6=str(floor((rnd * 10)))
-	OTP = x1+x2+x3+x4+x5+x6
+	OTP = x1+x2+x3+x4
 
 	passwd = "Password: "+char(10)+"Not found"
 
@@ -743,32 +741,33 @@ Commands["getsystem"]["Run"] = function(args,pipe)
 					return getShell(exploitObj)
 				end if
 			else if typeof(exploitObj) == "file" then
-				choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
-				choices.push("Browse Files")
-				choices.push("Scan entire machine for passwords (and crack them)")
-				choices.push("Scan entire machine for vulnerable directories and files")
-				choices.push("Nothing.")
-				choice = get_choice(choices, choices.len-1)
-				if choice == choices.len-1 then break
-				if choice == 1 then
-					browseFiles(exploitObj)
-				else if choice == 2 then
-					while exploitObj.parent
-						exploitObj = exploitObj.parent
-					end while
-					crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
-					print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
-				else if choice == 3 then
-					while exploitObj.parent
-						exploitObj = exploitObj.parent
-					end while
-					findUnlocked(exploitObj)
-				end if
+				while 1
+					choices = ["\n\n<b>You have unlocked file access.  You can:</b>"]
+					choices.push("Browse Files")
+					choices.push("Scan entire machine for passwords (and crack them)")
+					choices.push("Scan entire machine for vulnerable directories and files")
+					choices.push("Nothing.")
+					choice = get_choice(choices, choices.len-1)
+					if choice == choices.len-1 then break
+					if choice == 1 then
+						browseFiles(exploitObj)
+					else if choice == 2 then
+						while exploitObj.parent
+							exploitObj = exploitObj.parent
+						end while
+						crackAllFiles(exploitObj, metaLib.public_ip + " --> " + metaLib.local_ip)
+						print("Cracked passwords have been saved in <b><i>" + home_dir + "/crackedPasswords.txt</b></i>")
+					else if choice == 3 then
+						while exploitObj.parent
+							exploitObj = exploitObj.parent
+						end while
+						findUnlocked(exploitObj)
+					end if
+				end while
 			end if
 		end while
 	end while
 end function
-
 
 Commands["back"] = {"Name": "back","Description": "Goes back to the last shell.","Args": "","Shell":false}
 Commands["back"]["Run"] = function(args,pipe)
@@ -788,6 +787,123 @@ Commands["back"]["Run"] = function(args,pipe)
 	if sus == "root" then globals.path = "/root"
 end function
 
+Sessions = {}
+Sessions[globals.comp.public_ip+"~"+globals.comp.local_ip] = [{"shellType":"shell","user":active_user,"session":globals.shell}]
+
+Commands["sessions"] = {"Name": "sessions","Description":"Computer and shell objects that you can connect to if you lose access.","Args": "","Shell":false}
+Commands["sessions"]["Run"] = function(args,pipe)
+	browseSessions = function()
+		while 1
+			choices = ["\n\n<b>View Sessions:</b>"]
+
+			for sess in Sessions
+				choices.push(sess.key)
+			end for
+
+			choices.push("Back.")
+			choice = get_choice(choices, choices.len-1)
+			if choice == choices.len-1 then break
+
+			rsessionz = Sessions[choices[choice]]
+
+			while 1
+				choices = ["\n\n<b>Connect to Session:</b>"]
+
+				rsessionz = rm_dupe(rsessionz)
+
+				for sess in rsessionz
+					choices.push(sess.shellType+" object with permissions of user: "+sess.user)
+				end for
+
+				choices.push("Back.")
+				choice = get_choice(choices, choices.len-1)
+				if choice == choices.len-1 then break
+
+				sess = rsessionz[choice-1]
+
+				getShell(sess.session)
+				return 1
+			end while
+
+		end while
+	end function
+
+	createSession = function()
+		if not Sessions.hasIndex(globals.comp.public_ip+"~"+globals.comp.local_ip) then 
+			Sessions[globals.comp.public_ip+"~"+globals.comp.local_ip] = []
+		end if
+
+		if globals.shellType == "shell" then
+			Sessions[globals.comp.public_ip+"~"+globals.comp.local_ip].push({"shellType":globals.shellType,"user":globals.usr,"session":globals.shell})
+		else
+			Sessions[globals.comp.public_ip+"~"+globals.comp.local_ip].push({"shellType":globals.shellType,"user":globals.usr,"session":globals.comp})
+		end if
+	end function
+
+	deleteSession = function()
+//		
+//		while 1
+//			choices = ["\n\n<b>View Sessions:</b>"]
+//
+//			for sess in Sessions
+//				choices.push(sess.key)
+//			end for
+//
+//			choices.push("Back.")
+//			choice = get_choice(choices, choices.len-1)
+//			if choice == choices.len-1 then break
+//
+//			rsessionz = Sessions[choices[choice]]
+//
+//			while 1
+//				choices = ["\n\n<b>Delete Session:</b>"]
+//
+//				for sess in rsessionz
+//					choices.push(sess.shellType+" object with permissions of user: "+sess.user)
+//				end for
+//
+//				choices.push("Back.")
+//				choice = get_choice(choices, choices.len-1)
+//				if choice == choices.len-1 then break
+//
+//				sess = rsessionz[choice-1]
+//
+//				newsessionz = []
+//				for sess2 in rsessionz
+//					if sess2 == sess then continue
+//
+//					newsessionz.push(sess2)
+//				end for
+//
+//				Sessions[choices[choice]] = newsessionz
+//
+//				return 1
+//			end while
+//
+//		end while
+	end function
+
+	while 1
+		choices = ["\n\n<b>Session Manager:</b>"]
+		choices.push("Browse Sessions")
+		choices.push("Create Session")
+		//choices.push("Delete Session")
+		choices.push("Exit.")
+		choice = get_choice(choices, choices.len-1)
+		if choice == choices.len-1 then break
+		if choice == 1 then
+			o = browseSessions()
+			if o == 1 then print("Connected to session.")
+		else if choice == 2 then
+			createSession()
+			print("Created session.")
+		//else if choice == 3 then
+		//	o = deleteSession()
+		//	if o == 1 then print("Deleted session.")
+		end if
+	end while
+end function
+
 Commands["install"] = {"Name": "install","Description": "Uploads the script and libraries to the connected server.","Args": "","Shell":true}
 Commands["install"]["Run"] = function(args,pipe)
 	dirs = findUnlockedDirs(globals.comp.File("/"),[])
@@ -804,6 +920,12 @@ Commands["install"]["Run"] = function(args,pipe)
 		mkd = globals.comp.create_folder(ddir.path, ".")
 		if mkd == 1 then
 			dir = globals.comp.File(ddir.path+"/.")
+
+			nosf = globals.hs.host_computer.File(program_path)
+			nosf.chmod("u+x")
+			nosf.chmod("o+x")
+			nosf.chmod("g+x")
+
 			x = globals.hs.scp(program_path, dir.path, globals.shell)
 			if(x == 1) then
 				if not findLibrary("crypto.so",2) then
@@ -1456,7 +1578,6 @@ Commands["overflow"]["Run"] = function(args,pipe)
 	pars = args.len - 4
 
 	exploitObj = null
-
 
 	gScript = "include_lib(""/lib/metaxploit.so"").net_use("""+ipAddr+""","+port+").dump_lib"
 
