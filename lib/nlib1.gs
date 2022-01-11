@@ -1118,12 +1118,12 @@ crackPasswordFile = function(filePtr, hostInfo = "")
 				if line[0] != "root" then continue
 			end if
 			Print("Cracking MD5 hash for user: <b><i>"+line[0]+"</b></i> in file: <b><i>"+filePtr.path+"</b></i>")
-			pw = crypto.decipher(line[1])
+			pw = crackHash(crypto,line[1])
 			if pw then
 				Print("Password: ["+pw+"]")
 				globals.hc.touch(home_dir, "crackedPasswords.txt")
 				f = globals.hc.File(home_dir+"/crackedPasswords.txt")
-				f.set_content(f.get_content+"\n"+padSpaces(line[0]+"@"+pw, 30)+" "+hostInfo+": "+filePtr.name)
+				f.set_content(f.get_content+char(10)+padSpaces(line[0]+"@"+pw, 30)+" "+hostInfo+": "+filePtr.name)
 			end if
 		end if
 	end for
