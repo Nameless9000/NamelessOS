@@ -1,31 +1,12 @@
-date_expired = function(date1)
-	date1 = date1.split("-")
-	d11 = date1[0].to_int
-	d12 = date1[1].to_int
-	d13 = date1[2].to_int
-	date1[0] = d11+1
-
-	date = current_date.split(" ")
-	date = date[0].split("-")
-
-	d21 = date[0].to_int
-	d22 = date[1].to_int
-	d23 = date[2].to_int
-
-	if d23 > d13 then return 1
-	if d22 > d12 then return 1
-	if d21 > d11 then return 1
-
-	return 0
-end function
-
 get_next_date = function()
 	date1 = current_date.split(" ")[0].split("-")
-	d11 = date1[0].to_int
-	d12 = date1[1].to_int
-	d13 = date1[2].to_int
-	date1[0] = d11+1
-	return date1.join("-")
+	return date1[0].to_int+1
+end function
+
+date_expired = function(date)
+	if date.to_int == get_next_date then return 1
+
+	return 0
 end function
 
 gen2FA = function()
